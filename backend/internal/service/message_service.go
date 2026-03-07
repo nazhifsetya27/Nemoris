@@ -35,6 +35,12 @@ func ProcessMessage(from string, body string) string {
 	parsed := ai.Parse(body)
 
 	if parsed.Intent == "create_reminder" {
+		if parsed.Time == "" {
+			if parsed.Lang == "id" {
+				return "tolong tentukan waktu pengingat"
+			}
+			return "please specify reminder time"
+		}
 		if response := CreateReminderFromMessage(from, body); response != "" {
 			return response
 		}
