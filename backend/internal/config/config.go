@@ -1,8 +1,9 @@
 package config
 
 import (
-	"log"
 	"os"
+
+	"nemoris/internal/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -24,7 +25,8 @@ var App AppConfig
 func Load() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		utils.LogSystem("Error loading .env file")
+		os.Exit(1)
 	}
 
 	wahaURL := os.Getenv("WAHA_BASE_URL")

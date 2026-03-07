@@ -25,12 +25,10 @@ var (
 func RateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := extractIP(r)
-
-		rateLimitStoreMu.Lock()
-		defer rateLimitStoreMu.Unlock()
 		now := time.Now()
 		cutoff := now.Add(-rateLimitWindowSec * time.Second)
 
+		rateLimitStoreMu.Lock()
 		// 1. Remove timestamps older than 60 seconds
 		ts := rateLimitStore[ip]
 		pruned := ts[:0]
@@ -51,6 +49,7 @@ func RateLimit(next http.Handler) http.Handler {
 		// 3. Reject if count >= 10
 		if count >= rateLimitMaxRequests {
 			rateLimitStore[ip] = pruned
+			rateLimitStoreMu.Unlock()
 			utils.LogSystem("rate limit blocked: " + ip)
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -61,6 +60,7 @@ func RateLimit(next http.Handler) http.Handler {
 		// 4. Append current timestamp if accepted
 		pruned = append(pruned, now)
 		rateLimitStore[ip] = pruned
+		rateLimitStoreMu.Unlock()
 
 		next.ServeHTTP(w, r)
 	})

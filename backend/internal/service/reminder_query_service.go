@@ -14,3 +14,8 @@ func ListAllReminders(from string) ([]model.Reminder, error) {
 func ListPendingReminders() ([]model.Reminder, error) {
 	return repository.GetPendingReminders()
 }
+
+// ListFailedReminders returns reminders that failed delivery, ordered newest first.
+func ListFailedReminders(from string) ([]model.Reminder, error) {
+	return repository.GetFailedReminders(from)
+}

@@ -76,25 +76,42 @@ func MarkReminderSent(id string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"status":  model.ReminderSent,
-			"sent_at": &now,
+			"status":      model.ReminderSent,
+			"sent_at":     &now,
+			"last_error":  "",
 		}).Error
 }
 
-func MarkReminderRetrying(id string, retryCount int) error {
+func MarkReminderRetrying(id string, retryCount int, lastError string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"status":      model.ReminderRetrying,
 			"retry_count": retryCount,
+			"last_error":  lastError,
 		}).Error
 }
 
-func MarkReminderFailed(id string, retryCount int) error {
+func MarkReminderFailed(id string, retryCount int, lastError string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"status":      model.ReminderFailed,
 			"retry_count": retryCount,
+			"last_error":  lastError,
 		}).Error
+}
+
+func GetFailedReminders(from string) ([]model.Reminder, error) {
+	var reminders []model.Reminder
+
+	query := database.DB.Where("status = ?", model.ReminderFailed).Order("created_at desc")
+
+	if from != "" {
+		query = query.Where(`"from" = ?`, from)
+	}
+
+	err := query.Find(&reminders).Error
+
+	return reminders, err
 }
