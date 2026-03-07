@@ -3,7 +3,6 @@ package whatsapp
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,9 +36,9 @@ func SendText(to string, text string) SendResult {
 	}
 
 	// EPIC 4: Temporary simulated failure for retry logic testing — set to false for production
-	if true {
-		return SendResult{Accepted: false, Err: errors.New("simulated failure")}
-	}
+	// if true {
+	// 	return SendResult{Accepted: false, Err: errors.New("simulated failure")}
+	// }
 
 	utils.LogOutbound("To: " + to + " | Text: " + text)
 
