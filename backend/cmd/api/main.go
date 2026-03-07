@@ -7,6 +7,7 @@ import (
 	"nemoris/internal/config"
 	"nemoris/internal/database"
 	"nemoris/internal/handler"
+	"nemoris/internal/scheduler"
 )
 
 func main() {
@@ -14,6 +15,8 @@ func main() {
 
 	database.Connect()
 	database.Migrate()
+
+	scheduler.Start()
 
 	http.HandleFunc("/health", handler.HealthCheck)
 	http.HandleFunc("/webhook", handler.WebhookHandler)

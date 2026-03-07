@@ -8,6 +8,7 @@ import (
 )
 
 func Migrate() {
+	DB.Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`)
 	err := DB.AutoMigrate(
 		&model.Message{},
 		&model.Reminder{},

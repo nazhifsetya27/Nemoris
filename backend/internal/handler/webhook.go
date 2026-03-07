@@ -26,7 +26,10 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request) {
 	response := service.ProcessMessage(msg.From, msg.Body)
 
 	if response != "" {
-		whatsapp.SendText(msg.From, response)
+		result := whatsapp.SendText(msg.From, response)
+		if result.Err != nil {
+			utils.LogInbound("send failed: " + result.Err.Error())
+		}
 	}
 
 	w.Write([]byte("ok"))

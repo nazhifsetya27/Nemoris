@@ -4,6 +4,7 @@
 # Go binaries
 /backend/main
 /backend/backend
+/backend/tmp/
 
 # Dependency directories (only if you use 'go mod vendor')
 vendor/

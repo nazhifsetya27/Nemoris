@@ -2,8 +2,8 @@
 /**
  * NEMORIS Docs Server
  * Serves docs so you can read them on your phone.
+ * Auto-detects .md, .markdown, .txt in docs/ and subdirs (e.g. docs/sprint).
  * Run: node serve.js
- * Then open the printed URL on your phone (same WiFi).
  */
 
 const http = require('http');
@@ -14,9 +14,14 @@ const os = require('os');
 const PORT = process.env.PORT || 3847;
 const DOCS_DIR = __dirname;
 
+const DOC_EXTS = ['.md', '.markdown', '.txt'];
+const SKIP_NAMES = ['index.html', 'serve.js'];
+
 const MIME = {
   '.html': 'text/html',
   '.md': 'text/markdown',
+  '.markdown': 'text/markdown',
+  '.txt': 'text/plain',
   '.css': 'text/css',
   '.js': 'application/javascript',
   '.json': 'application/json',
@@ -35,9 +40,45 @@ function getLocalIP() {
   return null;
 }
 
+/** Recursively find doc files, return { path, title, group } */
+function scanDocs(dir, base = '') {
+  const items = [];
+  const names = fs.readdirSync(dir);
+  for (const name of names) {
+    const full = path.join(dir, name);
+    const rel = base ? path.join(base, name) : name;
+    const stat = fs.statSync(full);
+    if (stat.isDirectory()) {
+      items.push(...scanDocs(full, rel));
+    } else if (stat.isFile() && !SKIP_NAMES.includes(name)) {
+      const ext = path.extname(name).toLowerCase();
+      if (DOC_EXTS.includes(ext)) {
+        const group = base || null;
+        const baseName = path.basename(name, ext);
+        const title = baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        items.push({ path: rel, title, group });
+      }
+    }
+  }
+  return items.sort((a, b) => a.path.localeCompare(b.path));
+}
+
 const server = http.createServer((req, res) => {
   let url = req.url === '/' ? '/index.html' : req.url;
   url = url.split('?')[0];
+
+  if (url === '/api/docs') {
+    res.setHeader('Content-Type', 'application/json');
+    try {
+      const docs = scanDocs(DOCS_DIR);
+      res.end(JSON.stringify(docs));
+    } catch (err) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Failed to scan docs' }));
+    }
+    return;
+  }
+
   const filePath = path.join(DOCS_DIR, path.normalize(url));
 
   if (!filePath.startsWith(DOCS_DIR)) {

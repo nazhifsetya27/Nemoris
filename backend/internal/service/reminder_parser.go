@@ -34,6 +34,7 @@ func ParseReminder(body string) (string, string, time.Time, bool) {
 
 func parseTomorrowTime(raw string) (time.Time, bool) {
 	raw = strings.TrimSpace(strings.ToLower(raw))
+	raw = strings.TrimPrefix(raw, "at ")
 
 	var hour int
 	var err error

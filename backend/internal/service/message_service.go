@@ -10,8 +10,8 @@ import (
 
 func ProcessMessage(from string, body string) string {
 	if from == config.App.BotNumber {
-	utils.LogInbound("Self message ignored")
-	return "" 
+		utils.LogInbound("Self message ignored")
+		return ""
 	}
 
 	isDuplicate, err := repository.FindRecentDuplicate(from, body)
@@ -31,20 +31,8 @@ func ProcessMessage(from string, body string) string {
 		return "internal error"
 	}
 
-	task, rawTime, remindTime, ok := ParseReminder(body)
-	if ok {
-	utils.LogAI("Reminder detected")
-	utils.LogAI("Task: " + task)
-	utils.LogAI("RawTime: " + rawTime)
-	utils.LogAI("Parsed Time: " + remindTime.String())
-
-	err = repository.SaveReminder(from, task, rawTime, remindTime)
-	if err != nil {
-		utils.LogDB("Reminder save failed: " + err.Error())
-		return "internal error"
-	}
-
-	return "reminder noted"
+	if response := CreateReminderFromMessage(from, body); response != "" {
+		return response
 	}
 
 	switch strings.ToLower(body) {

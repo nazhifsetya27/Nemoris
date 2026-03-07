@@ -49,7 +49,7 @@
     .doc-list {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 1rem;
     }
     .doc-link {
       display: block;
@@ -72,6 +72,8 @@
     }
     .doc-link .title { font-size: 1rem; }
     .doc-link .desc { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+    .doc-group { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .doc-group-title { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-left: 0.25rem; }
     .back-btn {
       display: inline-flex;
       align-items: center;
@@ -138,23 +140,8 @@
         <h1>NEMORIS Docs</h1>
         <p class="tagline">One message sent, system never forgets.</p>
       </header>
-      <nav class="doc-list">
-        <a class="doc-link" href="#" data-doc="progress.md">
-          <span class="title">Progress Summary</span>
-          <span class="desc">Current build status, multilingual MVP, phases</span>
-        </a>
-        <a class="doc-link" href="#" data-doc="MASTER_ROADMAP_V1.md">
-          <span class="title">Master Roadmap</span>
-          <span class="desc">Product evolution & phases</span>
-        </a>
-        <a class="doc-link" href="#" data-doc="project_instructions.md">
-          <span class="title">Project Instructions</span>
-          <span class="desc">Dev setup & engineering principles</span>
-        </a>
-        <a class="doc-link" href="#" data-doc="architecture.md">
-          <span class="title">Architecture</span>
-          <span class="desc">Technical docs, multilingual flow, system design</span>
-        </a>
+      <nav class="doc-list" id="docList">
+        <div class="loading">Loading docs…</div>
       </nav>
     </div>
     <div class="viewer" id="viewer">
@@ -163,45 +150,81 @@
     </div>
   </div>
   <script>
-    const docs = [
-      { file: 'progress.md', title: 'Progress Summary' },
-      { file: 'MASTER_ROADMAP_V1.md', title: 'Master Roadmap' },
-      { file: 'project_instructions.md', title: 'Project Instructions' },
-      { file: 'architecture.md', title: 'Architecture' }
-    ];
+    let docs = [];
     marked.setOptions({ gfm: true, breaks: true });
-    document.querySelectorAll('.doc-link').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const file = link.dataset.doc;
-        loadDoc(file);
-      });
-    });
+
+    async function loadDocList() {
+      const list = document.getElementById('docList');
+      try {
+        const res = await fetch('/api/docs');
+        if (!res.ok) throw new Error(res.statusText);
+        docs = await res.json();
+        const byGroup = {};
+        docs.forEach(d => {
+          const g = d.group || '';
+          if (!byGroup[g]) byGroup[g] = [];
+          byGroup[g].push(d);
+        });
+        list.innerHTML = '';
+        Object.keys(byGroup).sort().forEach(group => {
+          const div = document.createElement('div');
+          div.className = 'doc-group';
+          if (group) {
+            const h = document.createElement('div');
+            h.className = 'doc-group-title';
+            h.textContent = group;
+            div.appendChild(h);
+          }
+          byGroup[group].forEach(d => {
+            const a = document.createElement('a');
+            a.className = 'doc-link';
+            a.href = '#';
+            a.dataset.doc = d.path;
+            a.innerHTML = '<span class="title">' + escapeHtml(d.title) + '</span><span class="desc">' + d.path + '</span>';
+            a.addEventListener('click', (e) => { e.preventDefault(); loadDoc(d.path); });
+            div.appendChild(a);
+          });
+          list.appendChild(div);
+        });
+      } catch (err) {
+        list.innerHTML = '<div class="error">Could not load doc list: ' + escapeHtml(err.message) + '</div>';
+      }
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
     document.getElementById('backBtn').addEventListener('click', (e) => {
       e.preventDefault();
       document.getElementById('listView').classList.add('active');
       document.getElementById('viewer').classList.remove('active');
       history.replaceState({ view: 'list' }, '', '');
     });
+
     async function loadDoc(file) {
       const content = document.getElementById('content');
       content.innerHTML = '<div class="loading">Loading…</div>';
       document.getElementById('listView').classList.remove('active');
       document.getElementById('viewer').classList.add('active');
-      history.replaceState({ view: 'doc', file }, '', '#' + file);
+      history.replaceState({ view: 'doc', file }, '', '#' + encodeURIComponent(file));
       try {
         const res = await fetch(file);
         if (!res.ok) throw new Error(res.statusText);
-        const md = await res.text();
-        content.innerHTML = marked.parse(md);
+        const text = await res.text();
+        const ext = (file.match(/\.(\w+)$/) || [])[1] || '';
+        content.innerHTML = (ext === 'md' || ext === 'markdown') ? marked.parse(text) : '<pre>' + escapeHtml(text) + '</pre>';
       } catch (err) {
-        content.innerHTML = '<div class="error">Could not load: ' + err.message + '</div>';
+        content.innerHTML = '<div class="error">Could not load: ' + escapeHtml(err.message) + '</div>';
       }
     }
-    if (location.hash) {
-      const file = location.hash.slice(1);
-      if (docs.some(d => d.file === file)) loadDoc(file);
-    }
+
+    loadDocList().then(() => {
+      const hash = decodeURIComponent(location.hash.slice(1));
+      if (hash && docs.some(d => d.path === hash)) loadDoc(hash);
+    });
   </script>
 </body>
 </html>

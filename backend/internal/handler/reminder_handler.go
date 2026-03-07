@@ -8,7 +8,9 @@ import (
 )
 
 func GetReminders(w http.ResponseWriter, r *http.Request) {
-	reminders, err := repository.GetAllReminders()
+	from := r.URL.Query().Get("from")
+
+	reminders, err := repository.GetAllReminders(from)
 	if err != nil {
 		http.Error(w, "failed to fetch reminders", http.StatusInternalServerError)
 		return
