@@ -27,3 +27,9 @@ func LogAI(message string) {
 func LogSecurity(message string) {
 	log.Println("[INBOUND/SECURITY]", message)
 }
+
+// LogSystem logs system-level events (e.g. panic recovery).
+// Category: [SYSTEM]
+func LogSystem(message string) {
+	log.Println("[SYSTEM]", message)
+}
