@@ -1,7 +1,7 @@
 package database
 
 import (
-	"log"
+	"os"
 
 	"nemoris/internal/model"
 	"nemoris/internal/utils"
@@ -15,7 +15,8 @@ func Migrate() {
 	)
 
 	if err != nil {
-		log.Fatal("Migration failed:", err)
+		utils.LogSystem("database migration failed: " + err.Error())
+		os.Exit(1)
 	}
 
 	utils.LogDB("Database Migrated")
