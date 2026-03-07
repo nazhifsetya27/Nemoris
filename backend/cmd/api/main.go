@@ -7,19 +7,17 @@ import (
 	"nemoris/internal/config"
 	"nemoris/internal/database"
 	"nemoris/internal/handler"
+	"nemoris/internal/middleware"
 	"nemoris/internal/scheduler"
 )
 
 func main() {
 	config.Load()
-
-	database.Connect()
-	database.Migrate()
-
+	database.Init()
 	scheduler.Start()
 
 	http.HandleFunc("/health", handler.HealthCheck)
-	http.HandleFunc("/webhook", handler.WebhookHandler)
+	http.Handle("/webhook", middleware.WebhookAuth(http.HandlerFunc(handler.WebhookHandler)))
 	http.HandleFunc("/reminders", handler.GetReminders)
 	http.HandleFunc("/reminders/pending", handler.GetPendingReminders)
 

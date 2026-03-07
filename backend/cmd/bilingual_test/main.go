@@ -25,8 +25,7 @@ type testResult struct {
 
 func main() {
 	config.Load()
-	database.Connect()
-	database.Migrate()
+	database.Init()
 
 	from := "test-bilingual-001"
 	if config.App.BotNumber == from {

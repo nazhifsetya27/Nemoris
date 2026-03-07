@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"nemoris/internal/repository"
+	"nemoris/internal/service"
 )
 
 func GetReminders(w http.ResponseWriter, r *http.Request) {
 	from := r.URL.Query().Get("from")
 
-	reminders, err := repository.GetAllReminders(from)
+	reminders, err := service.ListAllReminders(from)
 	if err != nil {
 		http.Error(w, "failed to fetch reminders", http.StatusInternalServerError)
 		return
@@ -21,7 +21,7 @@ func GetReminders(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetPendingReminders(w http.ResponseWriter, r *http.Request) {
-	reminders, err := repository.GetPendingReminders()
+	reminders, err := service.ListPendingReminders()
 	if err != nil {
 		http.Error(w, "failed to fetch pending reminders", http.StatusInternalServerError)
 		return

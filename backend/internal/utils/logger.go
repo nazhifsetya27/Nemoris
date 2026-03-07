@@ -21,3 +21,9 @@ func LogScheduler(message string) {
 func LogAI(message string) {
 	log.Println("[AI]", message)
 }
+
+// LogSecurity logs security events (category: inbound/security).
+// Never log secrets—only authorized/unauthorized outcomes.
+func LogSecurity(message string) {
+	log.Println("[INBOUND/SECURITY]", message)
+}

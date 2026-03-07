@@ -10,7 +10,7 @@ import (
 
 // ListRemindersFromMessage fetches reminders for the user and returns formatted response.
 func ListRemindersFromMessage(from string, lang string) string {
-	reminders, err := repository.GetAllReminders(from)
+	reminders, err := ListAllReminders(from)
 	if err != nil {
 		utils.LogDB("List reminders failed: " + err.Error())
 		return "internal error"

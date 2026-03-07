@@ -8,14 +8,15 @@ import (
 )
 
 type AppConfig struct {
-	DBHost      string
-	DBUser      string
-	DBPassword  string
-	DBName      string
-	DBPort      string
-	BotNumber   string
-	WAHABaseURL string
-	WAHAAPIKey  string
+	DBHost        string
+	DBUser        string
+	DBPassword    string
+	DBName        string
+	DBPort        string
+	BotNumber     string
+	WAHABaseURL   string
+	WAHAAPIKey    string
+	WebhookSecret string
 }
 
 var App AppConfig
@@ -31,13 +32,14 @@ func Load() {
 		wahaURL = "http://localhost:3000"
 	}
 	App = AppConfig{
-		DBHost:      os.Getenv("DB_HOST"),
-		DBUser:      os.Getenv("DB_USER"),
-		DBPassword:  os.Getenv("DB_PASSWORD"),
-		DBName:      os.Getenv("DB_NAME"),
-		DBPort:      os.Getenv("DB_PORT"),
-		BotNumber:   os.Getenv("BOT_NUMBER"),
-		WAHABaseURL: wahaURL,
-		WAHAAPIKey:  os.Getenv("WAHA_API_KEY"),
+		DBHost:        os.Getenv("DB_HOST"),
+		DBUser:        os.Getenv("DB_USER"),
+		DBPassword:    os.Getenv("DB_PASSWORD"),
+		DBName:        os.Getenv("DB_NAME"),
+		DBPort:        os.Getenv("DB_PORT"),
+		BotNumber:     os.Getenv("BOT_NUMBER"),
+		WAHABaseURL:   wahaURL,
+		WAHAAPIKey:    os.Getenv("WAHA_API_KEY"),
+		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
 	}
 }
