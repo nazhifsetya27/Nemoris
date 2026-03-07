@@ -5,12 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"nemoris/internal/config"
 	"nemoris/internal/utils"
 )
+
+var (
+	duplicateMu    sync.Mutex
+	duplicateStore = make(map[string]time.Time)
+)
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type sendTextPayload struct {
 	Session string `json:"session"`
@@ -25,7 +37,9 @@ type SendResult struct {
 }
 
 func SendText(to string, text string) SendResult {
-	if strings.TrimSpace(text) == "" {
+	// Protection 3: safe empty normalization
+	text = strings.TrimSpace(text)
+	if text == "" {
 		utils.LogOutbound("Blocked empty message")
 		return SendResult{Accepted: false, Err: nil}
 	}
@@ -34,6 +48,30 @@ func SendText(to string, text string) SendResult {
 		utils.LogOutbound("Blocked self message")
 		return SendResult{Accepted: false, Err: nil}
 	}
+
+	// Protection 2: duplicate outbound suppression
+	key := to + "|" + text
+	duplicateBlocked := false
+	func() {
+		duplicateMu.Lock()
+		defer duplicateMu.Unlock()
+		if t, ok := duplicateStore[key]; ok && time.Since(t) < 10*time.Second {
+			utils.LogOutbound("duplicate blocked")
+			duplicateBlocked = true
+			return
+		}
+		for k, v := range duplicateStore {
+			if time.Since(v) > 10*time.Second {
+				delete(duplicateStore, k)
+			}
+		}
+	}()
+	if duplicateBlocked {
+		return SendResult{Accepted: false, Err: nil}
+	}
+
+	// Protection 1: outbound pacing (300ms + random 0..600ms)
+	time.Sleep(300*time.Millisecond + time.Duration(rand.Intn(601))*time.Millisecond)
 
 	// EPIC 4: Temporary simulated failure for retry logic testing — set to false for production
 	// if true {
@@ -78,6 +116,17 @@ func SendText(to string, text string) SendResult {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return SendResult{Accepted: false, Err: fmt.Errorf("WAHA sendText failed (status %d): %s", resp.StatusCode, string(respBody))}
 	}
+
+	// Record duplicate only after successful HTTP send
+	duplicateMu.Lock()
+	defer duplicateMu.Unlock()
+	now := time.Now()
+	for k, v := range duplicateStore {
+		if time.Since(v) > 10*time.Second {
+			delete(duplicateStore, k)
+		}
+	}
+	duplicateStore[key] = now
 
 	utils.LogOutbound("WAHA response: " + string(respBody))
 	return SendResult{Accepted: true, Err: nil}
