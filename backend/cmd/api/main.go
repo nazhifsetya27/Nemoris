@@ -18,7 +18,7 @@ func main() {
 	scheduler.Start()
 
 	http.Handle("/health", middleware.Recover(http.HandlerFunc(handler.HealthCheck)))
-	http.Handle("/webhook", middleware.Recover(middleware.WebhookAuth(http.HandlerFunc(handler.WebhookHandler))))
+	http.Handle("/webhook", middleware.Recover(middleware.RateLimit(middleware.WebhookAuth(http.HandlerFunc(handler.WebhookHandler)))))
 	http.Handle("/reminders", middleware.Recover(http.HandlerFunc(handler.GetReminders)))
 	http.Handle("/reminders/pending", middleware.Recover(http.HandlerFunc(handler.GetPendingReminders)))
 
