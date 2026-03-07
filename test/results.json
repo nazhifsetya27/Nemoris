@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "request": "remind me to pay electricity tomorrow 8pm",
+    "response": "reminder noted",
+    "description": "English reminder with time"
+  },
+  {
+    "id": 2,
+    "request": "ingatkan saya untuk bayar listrik besok jam 8 malam",
+    "response": "reminder noted",
+    "description": "Indonesian reminder with time"
+  },
+  {
+    "id": 3,
+    "request": "list",
+    "response": "you have 4 reminder(s)\n1. bayar listrik\n2. pay electricity\n3. bayar listrik\n4. pay electricity",
+    "description": "English list reminders"
+  },
+  {
+    "id": 4,
+    "request": "daftar",
+    "response": "you have 4 reminder(s)\n1. bayar listrik\n2. pay electricity\n3. bayar listrik\n4. pay electricity",
+    "description": "Indonesian list reminders"
+  },
+  {
+    "id": 5,
+    "request": "ping",
+    "response": "pong",
+    "description": "Ping"
+  }
+]

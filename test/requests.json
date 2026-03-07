@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "body": "remind me to pay electricity tomorrow 8pm",
+    "description": "English reminder with time"
+  },
+  {
+    "id": 2,
+    "body": "ingatkan saya untuk bayar listrik besok jam 8 malam",
+    "description": "Indonesian reminder with time"
+  },
+  {
+    "id": 3,
+    "body": "list",
+    "description": "English list reminders"
+  },
+  {
+    "id": 4,
+    "body": "daftar",
+    "description": "Indonesian list reminders"
+  },
+  {
+    "id": 5,
+    "body": "ping",
+    "description": "Ping"
+  }
+]
