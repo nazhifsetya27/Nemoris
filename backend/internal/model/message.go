@@ -3,8 +3,8 @@ package model
 import "time"
 
 type Message struct {
-	ID        uint      `gorm:"primaryKey"`
-	From      string
-	Body      string
-	CreatedAt time.Time
+	BaseModel
+	From      string    `gorm:"index:idx_message_duplicate"`
+	Body      string    `gorm:"index:idx_message_duplicate"`
+	CreatedAt time.Time `gorm:"index:idx_message_duplicate"`
 }

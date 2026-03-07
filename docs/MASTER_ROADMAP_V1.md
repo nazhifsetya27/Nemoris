@@ -15,6 +15,14 @@ NEMORIS is being built as a **WhatsApp-native AI memory layer**:
 The product goal is not only reminders.
 The long-term goal is **persistent external memory for humans through chat**.
 
+## Multilingual Support (MVP)
+
+NEMORIS supports **2 languages from MVP stage**: Indonesian (`id`) and English (`en`).
+
+- Bilingual user input (Indonesian and English natural language)
+- Unified internal intent processing (language-neutral Canonical Intent)
+- Localized Reply Builder for responses
+
 ---
 
 # Product Evolution Map
@@ -48,11 +56,15 @@ Prove that one incoming message can safely become a stored reminder.
 - reminder parsing active
 - reminder save active
 - reminder listing active
+- **Multilingual foundation implemented in MVP (Indonesian + English)**
+  - Language Detection before Intent Parsing
+  - Canonical Intent (language-independent)
+  - Localized Reply Builder
 
 ## Current MVP capability
 
 ```text
-message → parse → persist → list
+message → language detection → parse → canonical intent → persist → localized reply → list
 ```
 
 ## Success definition
@@ -193,13 +205,28 @@ Move from command parser into semantic understanding.
 
 ## Example
 
+**English:**
+
 ```text
 remember my passport expires in december
 ```
 
+**Indonesian:**
+
+```text
+ingatkan saya paspor saya kadaluarsa bulan desember
+```
+
 ## Output target
 
-Structured JSON contract.
+Structured JSON contract with:
+
+- `language` — detected source language
+- `intent` — canonical intent (language-independent)
+- `task` — extracted task
+- `time` — extracted timestamp
+
+Canonical output is independent of source language.
 
 ---
 
@@ -440,6 +467,15 @@ You are launch-ready when:
 0 duplicate sends
 safe restart recovery
 ```
+
+---
+
+# Future Multilingual Expansion
+
+Beyond MVP (Indonesian + English):
+
+- Regional language support
+- Voice multilingual parsing
 
 ---
 

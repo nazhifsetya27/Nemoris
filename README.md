@@ -10,7 +10,13 @@ Instead of opening apps, creating tasks manually, or managing calendars, users s
 remind me to pay electricity tomorrow 8pm
 ```
 
-Nemoris turns that into structured memory, schedules it safely, and delivers it back when needed.
+or in Indonesian:
+
+```text
+ingatkan saya untuk bayar listrik besok jam 8 malam
+```
+
+Nemoris accepts both Indonesian and English user messages while converting them into one language-neutral internal command model. It turns that into structured memory, schedules it safely, and delivers it back when needed.
 
 ---
 
@@ -77,11 +83,14 @@ flowchart TD
 A[WhatsApp User] --> B[WAHA Gateway]
 B --> C[Go Backend]
 C --> D[Message Processing]
-D --> E[Reminder Parser]
-E --> F[PostgreSQL]
-F --> G[Scheduler]
-G --> H[Reminder Delivery]
-H --> B
+D --> E[Language Detection]
+E --> F[Intent Parsing]
+F --> G[Canonical Internal Intent]
+G --> H[PostgreSQL]
+G --> I[Scheduler]
+I --> J[Localized Reply Builder]
+J --> K[Reminder Delivery]
+K --> B
 ```
 
 ---
@@ -125,6 +134,7 @@ backend/
 - webhook receive from WhatsApp
 - duplicate protection
 - self-message protection
+- **multilingual support (Indonesian + English)** — Language Detection, Canonical Intent, Localized Reply
 - reminder parsing
 - PostgreSQL persistence
 - reminder listing API
@@ -133,22 +143,28 @@ backend/
 
 # Example Flow
 
-User sends:
+User sends (English or Indonesian):
 
 ```text
 remind me to call mom tomorrow 7pm
 ```
 
-System stores:
+```text
+ingatkan saya untuk telepon ibu besok jam 7 malam
+```
+
+System converts to Canonical Intent and stores:
 
 ```json
 {
+  "language": "id",
+  "intent": "create_reminder",
   "task": "call mom",
-  "time": "tomorrow 7pm"
+  "time": "2026-03-08T19:00:00+07:00"
 }
 ```
 
-Then schedules safe delivery.
+Then schedules safe delivery. Localized reply: "Reminder noted" or "Pengingat disimpan".
 
 ---
 

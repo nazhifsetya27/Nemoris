@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEMORIS Docs</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a20;
+      --text: #e8e8ed;
+      --muted: #8b8b9a;
+      --accent: #7c6ef6;
+      --accent-hover: #9b8fff;
+      --border: #2a2a32;
+      --code-bg: #25252d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1rem;
+      padding-bottom: 2rem;
+    }
+    header {
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .tagline {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .doc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .doc-link {
+      display: block;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .doc-link:active {
+      transform: scale(0.98);
+    }
+    .doc-link:hover {
+      border-color: var(--accent);
+      background: rgba(124, 110, 246, 0.08);
+    }
+    .doc-link .title { font-size: 1rem; }
+    .doc-link .desc { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn:hover { color: var(--accent-hover); }
+    .viewer { display: none; }
+    .viewer.active { display: block; }
+    .list-view.active { display: block; }
+    .list-view { display: none; }
+    .content {
+      padding: 1rem 0;
+      font-size: 0.95rem;
+    }
+    .content h1 { font-size: 1.75rem; margin: 1.5rem 0 0.75rem; }
+    .content h2 { font-size: 1.35rem; margin: 1.25rem 0 0.5rem; }
+    .content h3 { font-size: 1.15rem; margin: 1rem 0 0.5rem; }
+    .content p { margin-bottom: 0.75rem; }
+    .content ul, .content ol { margin: 0.5rem 0 1rem 1.5rem; }
+    .content li { margin-bottom: 0.25rem; }
+    .content pre {
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+    }
+    .content code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    .content pre code { padding: 0; background: none; }
+    .content blockquote {
+      border-left: 4px solid var(--accent);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: var(--muted);
+    }
+    .content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    .content th, .content td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    .content th { background: var(--surface); }
+    .content a { color: var(--accent); }
+    .content hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+    .loading { color: var(--muted); padding: 2rem 0; }
+    .error { color: #f87171; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="list-view active" id="listView">
+      <header>
+        <h1>NEMORIS Docs</h1>
+        <p class="tagline">One message sent, system never forgets.</p>
+      </header>
+      <nav class="doc-list">
+        <a class="doc-link" href="#" data-doc="progress.md">
+          <span class="title">Progress Summary</span>
+          <span class="desc">Current build status, multilingual MVP, phases</span>
+        </a>
+        <a class="doc-link" href="#" data-doc="MASTER_ROADMAP_V1.md">
+          <span class="title">Master Roadmap</span>
+          <span class="desc">Product evolution & phases</span>
+        </a>
+        <a class="doc-link" href="#" data-doc="project_instructions.md">
+          <span class="title">Project Instructions</span>
+          <span class="desc">Dev setup & engineering principles</span>
+        </a>
+        <a class="doc-link" href="#" data-doc="architecture.md">
+          <span class="title">Architecture</span>
+          <span class="desc">Technical docs, multilingual flow, system design</span>
+        </a>
+      </nav>
+    </div>
+    <div class="viewer" id="viewer">
+      <a class="back-btn" href="#" id="backBtn">← Back to docs</a>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+  <script>
+    const docs = [
+      { file: 'progress.md', title: 'Progress Summary' },
+      { file: 'MASTER_ROADMAP_V1.md', title: 'Master Roadmap' },
+      { file: 'project_instructions.md', title: 'Project Instructions' },
+      { file: 'architecture.md', title: 'Architecture' }
+    ];
+    marked.setOptions({ gfm: true, breaks: true });
+    document.querySelectorAll('.doc-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const file = link.dataset.doc;
+        loadDoc(file);
+      });
+    });
+    document.getElementById('backBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('listView').classList.add('active');
+      document.getElementById('viewer').classList.remove('active');
+      history.replaceState({ view: 'list' }, '', '');
+    });
+    async function loadDoc(file) {
+      const content = document.getElementById('content');
+      content.innerHTML = '<div class="loading">Loading…</div>';
+      document.getElementById('listView').classList.remove('active');
+      document.getElementById('viewer').classList.add('active');
+      history.replaceState({ view: 'doc', file }, '', '#' + file);
+      try {
+        const res = await fetch(file);
+        if (!res.ok) throw new Error(res.statusText);
+        const md = await res.text();
+        content.innerHTML = marked.parse(md);
+      } catch (err) {
+        content.innerHTML = '<div class="error">Could not load: ' + err.message + '</div>';
+      }
+    }
+    if (location.hash) {
+      const file = location.hash.slice(1);
+      if (docs.some(d => d.file === file)) loadDoc(file);
+    }
+  </script>
+</body>
+</html>

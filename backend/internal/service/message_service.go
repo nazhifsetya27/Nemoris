@@ -1,46 +1,46 @@
 package service
 
 import (
-	"log"
-	"os"
 	"strings"
 
+	"nemoris/internal/config"
 	"nemoris/internal/repository"
+	"nemoris/internal/utils"
 )
 
 func ProcessMessage(from string, body string) string {
-	if from == os.Getenv("BOT_NUMBER") {
-	log.Println("Self message ignored")
+	if from == config.App.BotNumber {
+	utils.LogInbound("Self message ignored")
 	return "" 
 	}
 
 	isDuplicate, err := repository.FindRecentDuplicate(from, body)
 	if err != nil {
-		log.Println("Duplicate check failed:", err)
+		utils.LogDB("Duplicate check failed: " + err.Error())
 		return "internal error"
 	}
 
 	if isDuplicate {
-		log.Println("Duplicate ignored")
+		utils.LogInbound("Duplicate ignored")
 		return "duplicate ignored"
 	}
 
 	err = repository.SaveMessage(from, body)
 	if err != nil {
-		log.Println("Save failed:", err)
+		utils.LogDB("Message save failed: " + err.Error())
 		return "internal error"
 	}
 
 	task, rawTime, remindTime, ok := ParseReminder(body)
 	if ok {
-	log.Println("Reminder detected")
-	log.Println("Task:", task)
-	log.Println("RawTime:", rawTime)
-	log.Println("Parsed Time:", remindTime)
+	utils.LogAI("Reminder detected")
+	utils.LogAI("Task: " + task)
+	utils.LogAI("RawTime: " + rawTime)
+	utils.LogAI("Parsed Time: " + remindTime.String())
 
 	err = repository.SaveReminder(from, task, rawTime, remindTime)
 	if err != nil {
-		log.Println("Reminder save failed:", err)
+		utils.LogDB("Reminder save failed: " + err.Error())
 		return "internal error"
 	}
 

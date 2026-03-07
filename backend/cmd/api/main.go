@@ -4,22 +4,16 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/joho/godotenv"
-
+	"nemoris/internal/config"
 	"nemoris/internal/database"
 	"nemoris/internal/handler"
-	"nemoris/internal/model"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-	log.Fatal("Error loading .env file")
-	}
+	config.Load()
 
 	database.Connect()
-
-	database.DB.AutoMigrate(&model.Message{}, &model.Reminder{})
+	database.Migrate()
 
 	http.HandleFunc("/health", handler.HealthCheck)
 	http.HandleFunc("/webhook", handler.WebhookHandler)

@@ -3,7 +3,9 @@ package database
 import (
 	"fmt"
 	"log"
-	"os"
+
+	"nemoris/internal/config"
+	"nemoris/internal/utils"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -12,12 +14,13 @@ import (
 var DB *gorm.DB
 
 func Connect() {
-dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		config.App.DBHost,
+		config.App.DBUser,
+		config.App.DBPassword,
+		config.App.DBName,
+		config.App.DBPort,
 	)
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -26,5 +29,5 @@ dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disabl
 		log.Fatal("Failed to connect database:", err)
 	}
 
-	log.Println("PostgreSQL connected")
+	utils.LogDB("PostgreSQL connected")
 }

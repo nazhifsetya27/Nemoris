@@ -3,10 +3,10 @@ package model
 import "time"
 
 type Reminder struct {
-	ID        uint      `gorm:"primaryKey"`
+	BaseModel
 	From      string
 	Task      string
 	RawTime   string
-	RemindAt  time.Time
+	RemindAt  time.Time `gorm:"index"`
 	CreatedAt time.Time
 }

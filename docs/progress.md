@@ -4,7 +4,7 @@
 
 This summary reflects what has already been completed in the current MVP backend build of **NEMORIS**.
 
-Based on the current codebase and architecture state: fileciteturn0file0 fileciteturn0file1
+NEMORIS supports **2 languages from MVP stage**: Indonesian (`id`) and English (`en`). Users send messages in either language; the system converts them into a language-neutral Canonical Intent and returns Localized Replies.
 
 ---
 
@@ -159,11 +159,21 @@ This prevents future WhatsApp loops.
 
 ## First parser implemented
 
-Supported command:
+Supported commands (bilingual):
+
+**English:**
 
 ```text
 remind me to pay electricity tomorrow 8pm
 ```
+
+**Indonesian:**
+
+```text
+ingatkan saya untuk bayar listrik besok jam 8 malam
+```
+
+Both map internally to the same Canonical Intent.
 
 ## Parser extracts
 
@@ -172,7 +182,7 @@ remind me to pay electricity tomorrow 8pm
 
 ## Reminder persistence active
 
-Saved into reminders table.
+Saved into reminders table. `language` field stored for analytics and localized delivery; business logic remains language-neutral.
 
 ---
 
@@ -202,12 +212,18 @@ This is the first true persistence milestone.
 
 ---
 
+# Multilingual Foundation (MVP) ✅
+
+- **Language Detection** — Detects `id` or `en` from incoming message before parsing.
+- **Canonical Intent** — Internal model is language-independent (e.g. `create_reminder`, never `buat_pengingat`).
+- **Localized Reply** — Responses generated in user's language (e.g. "Reminder noted" / "Pengingat disimpan").
+
 # Current MVP Capability Right Now ✅
 
 A WhatsApp-style message can already:
 
 ```text
-enter system → parse → save → list
+enter system → language detection → parse → canonical intent → save → localized reply → list
 ```
 
 Meaning core memory pipeline is alive.
@@ -319,11 +335,23 @@ Move beyond rule parsing.
 - query intent
 - note storage
 
-## Example
+## Example (bilingual)
+
+**English:**
 
 ```text
 remember my passport expires in december
 ```
+
+**Indonesian:**
+
+```text
+ingatkan saya paspor saya kadaluarsa bulan desember
+```
+
+## Output contract
+
+AI must return: `language`, `intent`, `task`, `time` — Canonical output independent of source language.
 
 ---
 
@@ -388,6 +416,11 @@ Only after local scheduler proven stable.
 ## Phase C
 
 - invisible AI memory companion
+
+## Future Multilingual Expansion
+
+- Regional language support
+- Voice multilingual parsing
 
 ---
 

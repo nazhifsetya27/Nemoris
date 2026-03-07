@@ -13,6 +13,14 @@ Primary goal:
 
 Build a stable, production-safe system that receives WhatsApp messages, interprets user intent, stores reminders/tasks/memory, and sends scheduled reminders safely.
 
+## Multilingual Support (MVP)
+
+NEMORIS supports **2 languages from MVP stage**: Indonesian (`id`) and English (`en`).
+
+- **Bilingual user input** — Indonesian and English natural language.
+- **Unified internal intent processing** — NEMORIS accepts both Indonesian and English user messages while converting them into one language-neutral internal command model.
+- **Localized Reply** — Responses generated via Localized Reply Builder based on detected language.
+
 ---
 
 # Development Environment Baseline
@@ -281,17 +289,26 @@ backend/
  │   ├── config/       # environment loading, app config, secrets mapping
  │   ├── database/     # postgres connection, migrations, db bootstrap
  │   ├── handler/      # HTTP handlers / webhook entrypoints
+ │   ├── i18n/         # localized message templates (id, en)
  │   ├── model/        # shared structs and domain models
  │   ├── reminder/     # reminder domain logic
  │   ├── repository/   # database access layer via GORM
  │   ├── scheduler/    # delayed jobs / recurring reminder execution
  │   ├── service/      # orchestration between modules
+ │   │   ├── language_detector.go   # detect id/en from incoming message
+ │   │   └── reply_builder.go      # generate response based on language
  │   ├── utils/        # shared helpers, reusable utilities
  │   └── whatsapp/     # WAHA integration, send/receive safety logic
  │
  ├── Dockerfile
  └── go.mod
 ```
+
+### Multilingual Components
+
+- **language_detector.go** — Detects `id` or `en` from incoming message; runs before Intent Parsing.
+- **reply_builder.go** — Generates response text based on detected language.
+- **internal/i18n/** — Localized message templates.
 
 ---
 
@@ -316,7 +333,7 @@ backend/
   reminders, recurring tasks, future notifications.
 
 - `ai/` must remain isolated from reminder logic:
-  AI returns structured intent only, business logic stays elsewhere.
+  AI returns structured intent only (language, intent, task, time); Canonical output is language-independent; business logic stays elsewhere.
 
 - `utils/` only for generic reusable helpers:
   avoid putting business logic here.
@@ -429,6 +446,14 @@ When generating documentation:
 - use mermaid diagrams when architecture is discussed
 - use production-grade naming
 - separate MVP vs future phases clearly
+
+## Terminology (Multilingual)
+
+Use consistent terminology everywhere:
+
+- **Language Detection** — detecting `id` or `en` from incoming message
+- **Canonical Intent** — language-independent internal intent (e.g. `create_reminder`, never `buat_pengingat`)
+- **Localized Reply** — response text generated in user's language
 
 ---
 

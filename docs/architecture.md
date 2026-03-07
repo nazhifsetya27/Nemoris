@@ -8,6 +8,16 @@ Core product goal:
 
 > Users send text, voice, or media via WhatsApp, and Nemoris transforms it into structured memory, reminders, and intelligent follow-up actions.
 
+## Multilingual Support (MVP)
+
+NEMORIS supports **2 languages from MVP stage**: Indonesian (`id`) and English (`en`).
+
+- **Bilingual user input** — Users may send messages in Indonesian or English natural language.
+- **Unified internal intent processing** — All messages are converted into one language-neutral internal command model.
+- **Localized replies** — Responses are generated in the user's detected language.
+
+> NEMORIS accepts both Indonesian and English user messages while converting them into one language-neutral internal command model.
+
 ---
 
 # 1. Product Scope
@@ -23,6 +33,8 @@ Core product goal:
 - AI summarization
 
 ## Example User Interactions
+
+**English:**
 
 ```text
 remind me to pay electricity tomorrow 8pm
@@ -40,6 +52,14 @@ remember my passport expires in december
 what are my pending tasks?
 ```
 
+**Indonesian:**
+
+```text
+ingatkan saya untuk bayar listrik besok jam 8 malam
+```
+
+Both languages map internally to the same canonical intent.
+
 ---
 
 # 2. High-Level Architecture
@@ -53,24 +73,40 @@ B --> C[Webhook API - Go Backend]
 
 C --> D[Message Processor]
 
-D --> E[LLM Parser]
+D --> E[Language Detection]
 
-D --> F[Rule Engine]
+E --> F[Intent Parsing]
 
-E --> G[Reminder Service]
+F --> G[Canonical Internal Intent]
 
-F --> G
+G --> H[Reminder Service]
 
-G --> H[(PostgreSQL)]
+H --> I[(PostgreSQL)]
 
-G --> I[(Redis Queue)]
+H --> J[(Redis Queue)]
 
-I --> J[Worker Scheduler]
+J --> K[Worker Scheduler]
 
-J --> K[Reminder Sender]
+K --> L[Localized Reply Builder]
 
-K --> B
+L --> M[Reminder Sender]
+
+M --> B
 ```
+
+**Message flow with multilingual support:**
+
+```mermaid
+flowchart TD
+A[Incoming WhatsApp Message] --> B[Language Detection]
+B --> C[Intent Parsing]
+C --> D[Canonical Internal Intent]
+D --> E[Reminder Service]
+E --> F[Localized Reply Builder]
+```
+
+- Language Detection runs before Intent Parsing.
+- Canonical Intent remains language-independent.
 
 ---
 
@@ -131,6 +167,17 @@ Transforms human language into structured commands.
 - Time extraction
 - Entity extraction
 - Task classification
+
+### Multilingual Contract
+
+The AI parser must return:
+
+- `language` — detected source language (`id` or `en`)
+- `intent` — canonical intent (language-independent)
+- `task` — extracted task text
+- `time` — extracted timestamp
+
+Canonical output is independent of source language.
 
 ---
 
@@ -207,18 +254,22 @@ sequenceDiagram
 participant User
 participant WAHA
 participant API
+participant LangDetect
 participant Parser
 participant DB
 participant Queue
+participant ReplyBuilder
 
 User->>WAHA: Send WhatsApp message
 WAHA->>API: Webhook event
-API->>Parser: Parse natural language
-Parser->>API: Structured JSON
+API->>LangDetect: Detect language (id/en)
+LangDetect->>Parser: Parse natural language
+Parser->>API: Canonical Intent (JSON)
 API->>DB: Save reminder
 API->>Queue: Schedule task
-API->>WAHA: Confirmation reply
-WAHA->>User: Reminder saved
+API->>ReplyBuilder: Build localized reply
+ReplyBuilder->>WAHA: Confirmation reply
+WAHA->>User: Reminder noted / Pengingat disimpan
 ```
 
 ---
@@ -255,9 +306,15 @@ B --> C[Download Audio]
 
 C --> D[Whisper Transcription]
 
-D --> E[LLM Parser]
+D --> E[Language Detection]
 
-E --> F[Reminder Service]
+E --> F[LLM Parser]
+
+F --> G[Canonical Internal Intent]
+
+G --> H[Reminder Service]
+
+H --> I[Localized Reply Builder]
 ```
 
 ---
@@ -266,21 +323,55 @@ E --> F[Reminder Service]
 
 ## Input
 
+**English:**
+
 ```json
 {
-  "message": "remind me to call mom tomorrow at 7pm"
+  "message": "remind me to pay electricity tomorrow 8pm"
 }
 ```
 
-## Output
+**Indonesian:**
 
 ```json
 {
+  "message": "ingatkan saya untuk bayar listrik besok jam 8 malam"
+}
+```
+
+## Output (Canonical Internal Model)
+
+Both inputs map to the same canonical output:
+
+```json
+{
+  "language": "id",
   "intent": "create_reminder",
-  "task": "call mom",
-  "time": "2026-03-08T19:00:00"
+  "task": "bayar listrik",
+  "time": "2026-03-08T20:00:00+07:00"
 }
 ```
+
+**Critical rule:** `intent` must never depend on human language.
+
+- **Allowed:** `create_reminder`
+- **Forbidden:** `buat_pengingat`
+
+## Parser Examples
+
+**English:**
+
+```text
+remind me to pay electricity tomorrow 8pm
+```
+
+**Indonesian:**
+
+```text
+ingatkan saya untuk bayar listrik besok jam 8 malam
+```
+
+Both map internally to the same Canonical Intent.
 
 ---
 
@@ -296,9 +387,13 @@ CREATE TABLE reminders (
     remind_at TIMESTAMP NOT NULL,
     recurrence TEXT,
     status TEXT DEFAULT 'pending',
+    language TEXT DEFAULT 'id',
     created_at TIMESTAMP DEFAULT now()
 );
 ```
+
+- `language` stored for analytics and localized delivery.
+- Business logic remains language-neutral.
 
 ---
 
@@ -322,9 +417,12 @@ CREATE TABLE memories (
     user_id UUID,
     content TEXT,
     type TEXT,
+    language TEXT DEFAULT 'id',
     created_at TIMESTAMP DEFAULT now()
 );
 ```
+
+- `language` stored for analytics and localized delivery.
 
 ---
 
@@ -343,7 +441,28 @@ internal/
   database/
   memory/
   worker/
+  service/
+    language_detector.go
+    reply_builder.go
+  i18n/
 ```
+
+## Internal Multilingual Components
+
+### language_detector.go
+
+- Detects `id` or `en` from incoming message.
+- Runs before Intent Parsing.
+
+### reply_builder.go
+
+- Generates response text based on detected language.
+- Uses localized templates from `internal/i18n/`.
+
+### internal/i18n/
+
+- Localized message templates.
+- Supports Indonesian and English.
 
 ---
 
@@ -370,12 +489,23 @@ Endpoint:
 POST /api/sendText
 ```
 
-Payload:
+Payload (localized response):
+
+**English:**
 
 ```json
 {
   "chatId": "628123456789@c.us",
-  "text": "Reminder saved"
+  "text": "Reminder noted"
+}
+```
+
+**Indonesian:**
+
+```json
+{
+  "chatId": "628123456789@c.us",
+  "text": "Pengingat disimpan"
 }
 ```
 
@@ -464,10 +594,16 @@ D --> H[Worker]
 
 # 18. Future Expansion
 
+## Multilingual Foundation (MVP Implemented)
+
+- **Multilingual foundation implemented in MVP (Indonesian + English)**
+- Language Detection before Intent Parsing
+- Canonical Intent (language-independent)
+- Localized Reply Builder
+
 ## Phase 2
 
 - Google Calendar sync
-- Multi-language parsing
 - AI memory retrieval
 
 ## Phase 3
@@ -475,6 +611,11 @@ D --> H[Worker]
 - Personal agent mode
 - Team memory
 - Shared reminders
+
+## Future Multilingual Expansion
+
+- Regional language support
+- Voice multilingual parsing
 
 ---
 

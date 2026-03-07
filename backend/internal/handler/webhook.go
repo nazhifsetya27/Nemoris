@@ -2,26 +2,32 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"nemoris/internal/model"
 	"nemoris/internal/service"
+	"nemoris/internal/whatsapp"
+	"nemoris/internal/utils"
 )
 
 func WebhookHandler(w http.ResponseWriter, r *http.Request) {
-	var msg model.IncomingMessage
+	var raw model.IncomingMessage
 
-	err := json.NewDecoder(r.Body).Decode(&msg)
+	err := json.NewDecoder(r.Body).Decode(&raw)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	log.Println("Incoming message:")
-	log.Printf("From: %s | Body: %s\n", msg.From, msg.Body)
+	msg := whatsapp.NormalizePayload(raw)
+
+	utils.LogInbound("From: " + msg.From + " | Body: " + msg.Body)
 
 	response := service.ProcessMessage(msg.From, msg.Body)
 
-	w.Write([]byte(response))
+	if response != "" {
+		whatsapp.SendText(msg.From, response)
+	}
+
+	w.Write([]byte("ok"))
 }
