@@ -1,6 +1,8 @@
 package ai
 
-// ParseResult holds the result of parsing a message body.
+import "time"
+
+// ParseResult holds the canonical structured contract shared by AI and rule parsers.
 type ParseResult struct {
 	Intent string
 	Lang   string
@@ -9,13 +11,28 @@ type ParseResult struct {
 }
 
 // Parse is the unified parser entry point.
-// Calls DetectIntent and DetectLanguage.
-// Task and Time are empty for now (no advanced extraction yet).
+// Always fills Intent and Lang.
+// For create_reminder only: uses ParseReminder to fill Task and Time (RFC3339).
+// If reminder parse fails, Task and Time stay empty.
 func Parse(body string) ParseResult {
-	return ParseResult{
-		Intent: DetectIntent(body),
-		Lang:   DetectLanguage(body),
+	intent := DetectIntent(body)
+	lang := DetectLanguage(body)
+	result := ParseResult{
+		Intent: intent,
+		Lang:   lang,
 		Task:   "",
 		Time:   "",
 	}
+
+	if intent == "create_reminder" {
+		task, _, parsedTime, ok := ParseReminder(body)
+		if ok {
+			result.Task = task
+			if !parsedTime.IsZero() {
+				result.Time = parsedTime.Format(time.RFC3339)
+			}
+		}
+	}
+
+	return result
 }
