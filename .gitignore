@@ -1,0 +1,23 @@
+# .secret
+*.env
+
+# Go binaries
+/backend/main
+/backend/backend
+
+# Dependency directories (only if you use 'go mod vendor')
+vendor/
+
+# Docker / Local Data
+waha_data/
+postgres_data/
+.docker/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
