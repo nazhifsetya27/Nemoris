@@ -11,12 +11,17 @@ type ParseResult struct {
 }
 
 // Parse is the unified parser entry point.
-// Always fills Intent and Lang.
-// For create_reminder only: uses ParseReminder to fill Task and Time (RFC3339).
-// If reminder parse fails, Task and Time stay empty.
+// Dual parsing strategy: rule parser first, fallback second.
+// Step 1: Detect intent and language.
+// Step 2: Build default ParseResult.
+// Step 3: For create_reminder, run rule parser; if success, return immediately.
+// Step 4: If rule parse fails, call fallbackParse (placeholder).
 func Parse(body string) ParseResult {
+	// Step 1: Detect intent and language
 	intent := DetectIntent(body)
 	lang := DetectLanguage(body)
+
+	// Step 2: Build default ParseResult
 	result := ParseResult{
 		Intent: intent,
 		Lang:   lang,
@@ -24,6 +29,7 @@ func Parse(body string) ParseResult {
 		Time:   "",
 	}
 
+	// Step 3: Rule parser for create_reminder
 	if intent == "create_reminder" {
 		task, _, parsedTime, ok := ParseReminder(body)
 		if ok {
@@ -31,8 +37,21 @@ func Parse(body string) ParseResult {
 			if !parsedTime.IsZero() {
 				result.Time = parsedTime.Format(time.RFC3339)
 			}
+			return result
 		}
 	}
 
-	return result
+	// Step 4: Rule parse failed — use fallback (placeholder)
+	return fallbackParse(body, intent, lang)
+}
+
+// fallbackParse is the fallback path when rule parsing fails.
+// Currently a placeholder: no external AI, no HTTP calls.
+func fallbackParse(body string, intent string, lang string) ParseResult {
+	return ParseResult{
+		Intent: intent,
+		Lang:   lang,
+		Task:   "",
+		Time:   "",
+	}
 }
