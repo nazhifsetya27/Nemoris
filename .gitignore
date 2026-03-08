@@ -14,6 +14,12 @@ waha_data/
 postgres_data/
 .docker/
 
+# Backup artifacts (folders kept via .gitkeep)
+backups/postgres/*.sql
+backups/redis/*.aof
+backups/redis/*.tar.gz
+backups/waha/*.tar.gz
+
 # OS files
 .DS_Store
 Thumbs.db
