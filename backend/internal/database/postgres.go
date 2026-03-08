@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"os"
 
 	"nemoris/internal/config"
 	"nemoris/internal/utils"
@@ -26,7 +26,8 @@ func Connect() {
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
-		log.Fatal("Failed to connect database:", err)
+		utils.LogSystem("database connect failed: " + err.Error())
+		os.Exit(1)
 	}
 
 	utils.LogDB("PostgreSQL connected")

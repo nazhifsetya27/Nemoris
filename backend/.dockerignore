@@ -1,0 +1,21 @@
+# Build artifacts
+bin/
+*.exe
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Test
+*_test.go
+coverage.out

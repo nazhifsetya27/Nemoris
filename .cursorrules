@@ -1,0 +1,332 @@
+# NEMORIS Cursor Rules
+
+You are working inside NEMORIS, a production-oriented WhatsApp-native AI memory assistant.
+
+## Core Stack
+
+- Go backend
+- WAHA Free
+- PostgreSQL
+- Redis
+- GORM
+- Docker Compose
+
+## Machine Constraints
+
+Development machine:
+
+- MacBook Air M1
+- 8GB RAM
+- ARM64
+
+Always prefer lightweight solutions.
+
+Avoid introducing heavy dependencies unless clearly justified.
+
+---
+
+# Primary Engineering Principle
+
+Production safety over speed.
+
+Never generate code that is clever but unstable.
+
+Always prefer:
+
+- explicit
+- readable
+- debuggable
+- minimal abstraction
+
+---
+
+# Mandatory Architecture
+
+Always follow:
+
+handler → service → repository → gorm → postgres
+
+Never allow:
+
+- handler calling repository directly
+- handler using GORM
+- service using GORM
+- multiple DB connection points
+
+---
+
+# Folder Discipline
+
+## cmd/
+
+Only boot application.
+
+main.go must contain only:
+
+- config init
+- db init
+- migration trigger
+- dependency wiring
+- route registration
+- server start
+
+## handler/
+
+Only:
+
+- decode request
+- validate input
+- call service
+- return response
+
+No business logic.
+
+## service/
+
+Only orchestration and business rules.
+
+No SQL.
+No GORM query.
+
+## repository/
+
+All DB access lives here.
+
+All GORM query lives here.
+
+## database/
+
+Only shared DB connection and migration entry.
+
+## whatsapp/
+
+Only WAHA integration.
+
+## ai/
+
+Only intent extraction and parsing logic.
+
+## scheduler/
+
+Only delayed execution logic.
+
+## utils/
+
+Only generic reusable helpers.
+
+---
+
+# GORM Rules
+
+Use GORM only inside repository layer.
+
+Allowed:
+
+- AutoMigrate() during MVP
+
+Forbidden:
+
+- GORM usage in service
+- GORM usage in handler
+
+Always separate:
+
+Incoming transport struct ≠ persistence model
+
+Example:
+
+IncomingMessage != Message
+
+---
+
+# WhatsApp Safety Rules
+
+Before sending outbound message:
+
+Always check:
+
+- payload not empty
+- recipient not self
+- duplicate prevention if needed
+
+Never send directly from random package.
+
+All outbound messaging must pass through:
+
+internal/whatsapp/send.go
+
+---
+
+# WAHA Safety
+
+Never assume WAHA payload shape.
+
+Always inspect real payload before mapping.
+
+Create transport structs first.
+
+Normalize payload before service layer.
+
+---
+
+# Logging Rules
+
+Prefer structured logs.
+
+Use event categories:
+
+- inbound
+- outbound
+- db
+- scheduler
+- ai
+
+Avoid random log.Println scattered everywhere.
+
+---
+
+# Error Handling Rules
+
+Never ignore errors.
+
+Always return explicit errors upward.
+
+Avoid panic unless startup fatal.
+
+---
+
+# Scheduler Rules
+
+Scheduler must never contain business logic.
+
+Flow must stay:
+
+scheduler → service → repository → whatsapp
+
+---
+
+# AI Rules
+
+AI output must always become canonical structured output.
+
+Never allow free-text AI decisions.
+
+Canonical output example:
+
+{
+"intent": "create_reminder",
+"task": "pay electricity",
+"time": "2026-03-08T20:00:00",
+"lang": "id"
+}
+
+---
+
+# Multilingual Rule
+
+NEMORIS supports:
+
+- Indonesian
+- English
+
+Internal intent must remain language-neutral.
+
+Allowed:
+
+create_reminder
+
+Forbidden:
+
+buat_pengingat
+
+---
+
+# Go Style Rule
+
+Assume developer is strong in JavaScript but beginner in Go.
+
+When generating code:
+
+Always prefer simple Go.
+
+Avoid advanced abstraction too early.
+
+Explain:
+
+- why file belongs in folder
+- why pattern is safe
+- JS comparison if useful
+
+---
+
+# Dependency Rule
+
+Before adding any dependency:
+
+Explain:
+
+1. why needed
+2. production impact
+3. memory impact
+4. simpler alternative
+
+---
+
+# Infrastructure Rule
+
+Current safe baseline:
+
+WAHA + PostgreSQL + Redis + Go backend
+
+Do not introduce:
+
+- Kafka
+- RabbitMQ
+- microservices
+- unnecessary worker systems
+
+unless explicitly requested.
+
+---
+
+# Code Generation Rule
+
+When editing existing code:
+
+Respect current architecture first.
+
+Never rewrite unrelated files unnecessarily.
+
+Generate minimal diff.
+
+---
+
+# Sprint Discipline
+
+Always align implementation with current sprint.
+
+Current priority:
+
+1. stabilize current layer
+2. avoid architecture debt
+3. keep production-safe growth
+
+---
+
+# Documentation Rule
+
+If architecture changes:
+
+Immediately remind:
+
+"Update project instructions now."
+
+---
+
+# Final Principle
+
+NEMORIS means:
+
+one message sent, system never forgets
+
+Every code change must improve reliability toward that goal.

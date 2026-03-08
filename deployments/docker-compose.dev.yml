@@ -1,0 +1,60 @@
+# NEMORIS — Development infrastructure
+# Purpose: Local development. Backend runs as local Go process (air/go run).
+# Use: make infra-dev
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: nemoris-postgres
+    env_file: ../.env
+    environment:
+      POSTGRES_USER: ${DB_USER:-nemoris}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nemoris}
+      POSTGRES_DB: ${DB_NAME:-nemoris}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: nemoris-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+
+  waha:
+    image: devlikeapro/waha
+    container_name: waha
+    env_file: ../.env
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      GODEBUG: netdns=go
+      WHATSAPP_HOOK_URL: http://host.docker.internal:8080/webhook
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "3000:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  waha_sessions:
+
+networks:
+  nemoris_net:
+    driver: bridge

@@ -11,5 +11,6 @@ type Reminder struct {
 	Status     string
 	SentAt     *time.Time
 	RetryCount int
+	LastError  string `gorm:"type:text"`
 	CreatedAt  time.Time
 }

@@ -3,14 +3,20 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
+	"nemoris/internal/service"
 )
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	response := map[string]string{
-		"status": "ok",
-	}
+	result := service.CheckHealth()
 
-	json.NewEncoder(w).Encode(response)
+	statusCode := http.StatusOK
+	if result.Status != "ok" {
+		statusCode = http.StatusServiceUnavailable
+	}
+	w.WriteHeader(statusCode)
+
+	json.NewEncoder(w).Encode(result)
 }
