@@ -32,6 +32,11 @@ func WebhookAuth(next http.Handler) http.Handler {
 
 		got := strings.TrimSpace(r.Header.Get(webhookSecretHeader))
 
+		// Dev only: fallback to query param ?token= for WAHA compatibility
+		if got == "" && config.App.AppEnv == "dev" {
+			got = strings.TrimSpace(r.URL.Query().Get("token"))
+		}
+
 		if got == "" {
 			utils.LogSecurity("webhook unauthorized: header missing")
 			w.Header().Set("Content-Type", "text/plain")

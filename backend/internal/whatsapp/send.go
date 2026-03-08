@@ -30,6 +30,27 @@ type sendTextPayload struct {
 	Text    string `json:"text"`
 }
 
+type wahaErrorResponse struct {
+	Exception struct {
+		Message string `json:"message"`
+	} `json:"exception"`
+}
+
+func extractWAHAErrorReason(body []byte) string {
+	var errResp wahaErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Exception.Message != "" {
+		return errResp.Exception.Message
+	}
+	s := string(body)
+	if len(s) > 120 {
+		return s[:120] + "..."
+	}
+	if s == "" {
+		return "no response body"
+	}
+	return s
+}
+
 // SendResult holds the outcome of a send attempt.
 type SendResult struct {
 	Accepted bool
@@ -80,9 +101,14 @@ func SendText(to string, text string) SendResult {
 
 	utils.LogOutbound("To: " + to + " | Text: " + text)
 
-	chatID := to
+	chatID := ResolveSendTarget(to)
 	if !strings.Contains(chatID, "@") {
 		chatID = chatID + "@c.us"
+	}
+	// Reject invalid chatId (e.g. "@c.us" without number from non-message events)
+	if chatID == "@c.us" || strings.HasPrefix(chatID, "@") {
+		utils.LogOutbound("Blocked invalid chatId: " + chatID)
+		return SendResult{Accepted: false, Err: nil}
 	}
 
 	payload := sendTextPayload{
@@ -114,7 +140,8 @@ func SendText(to string, text string) SendResult {
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return SendResult{Accepted: false, Err: fmt.Errorf("WAHA sendText failed (status %d): %s", resp.StatusCode, string(respBody))}
+		reason := extractWAHAErrorReason(respBody)
+		return SendResult{Accepted: false, Err: fmt.Errorf("status %d: %s", resp.StatusCode, reason)}
 	}
 
 	// Record duplicate only after successful HTTP send
@@ -128,6 +155,6 @@ func SendText(to string, text string) SendResult {
 	}
 	duplicateStore[key] = now
 
-	utils.LogOutbound("WAHA response: " + string(respBody))
+	utils.LogOutbound("sent")
 	return SendResult{Accepted: true, Err: nil}
 }

@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-nemoris}
       POSTGRES_DB: ${DB_NAME:-nemoris}
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -23,7 +23,7 @@ services:
     image: redis:7
     container_name: nemoris-redis
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -34,16 +34,17 @@ services:
   waha:
     image: devlikeapro/waha
     container_name: waha
+    platform: linux/amd64
     env_file: ../.env
     environment:
       WHATSAPP_DEFAULT_ENGINE: GOWS
       GODEBUG: netdns=go
-      WHATSAPP_HOOK_URL: http://host.docker.internal:8080/webhook
+      WHATSAPP_HOOK_URL: https://api-nemoris.nazhifsetya.biz.id/webhook?token=ulalakyakya
     dns:
       - 8.8.8.8
       - 1.1.1.1
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
       - waha_sessions:/app/.sessions
     networks:

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"nemoris/internal/utils"
 
@@ -18,6 +19,7 @@ type AppConfig struct {
 	WAHABaseURL   string
 	WAHAAPIKey    string
 	WebhookSecret string
+	AppEnv        string // "dev" enables query-token fallback for webhook auth
 }
 
 var App AppConfig
@@ -43,5 +45,6 @@ func Load() {
 		WAHABaseURL:   wahaURL,
 		WAHAAPIKey:    os.Getenv("WAHA_API_KEY"),
 		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
+		AppEnv:        strings.TrimSpace(strings.ToLower(os.Getenv("APP_ENV"))),
 	}
 }
