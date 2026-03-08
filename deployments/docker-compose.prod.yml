@@ -1,0 +1,86 @@
+# NEMORIS — Production infrastructure
+# Purpose: Full stack in containers. Backend built and run as nemoris-api.
+# Use: make infra-prod
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: nemoris-postgres
+    env_file: ../.env
+    environment:
+      POSTGRES_USER: ${DB_USER:-nemoris}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nemoris}
+      POSTGRES_DB: ${DB_NAME:-nemoris}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nemoris} -d ${DB_NAME:-nemoris}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: nemoris-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+
+  waha:
+    image: devlikeapro/waha
+    container_name: waha
+    env_file: ../.env
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      GODEBUG: netdns=go
+      WHATSAPP_HOOK_URL: http://nemoris-api:8080/webhook
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - waha_sessions:/app/.sessions
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: nemoris-api:latest
+    container_name: nemoris-api
+    env_file: ../.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      WAHA_BASE_URL: http://waha:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      waha:
+        condition: service_started
+    networks:
+      - nemoris_net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  waha_sessions:
+
+networks:
+  nemoris_net:
+    driver: bridge

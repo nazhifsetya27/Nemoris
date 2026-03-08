@@ -1,11 +1,22 @@
-FROM golang:1.23
+# Stage 1: Build
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
-COPY . .
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN go mod tidy
-RUN go build -o app ./cmd/api
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o app ./cmd/api
+
+# Stage 2: Runtime
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /app/app .
 
 EXPOSE 8080
 
