@@ -51,10 +51,14 @@ func ProcessMessage(from string, body string) string {
 		return ListRemindersFromMessage(from, parsed.Lang)
 	}
 
+	if parsed.Intent == "store_memory" {
+		return i18n.BuildFromIntent(parsed.Lang, "store_memory", nil)
+	}
+
 	switch strings.ToLower(body) {
 	case "ping":
 		return "pong"
 	default:
-		return i18n.Build(parsed.Lang, "unknown", nil)
+		return i18n.BuildFromIntent(parsed.Lang, "unknown", nil)
 	}
 }

@@ -53,5 +53,5 @@ func CreateReminderFromMessage(from string, body string, lang string) string {
 		return "internal error"
 	}
 
-	return i18n.Build(lang, "create_reminder_success", nil)
+	return i18n.BuildFromIntent(lang, "create_reminder", nil)
 }
