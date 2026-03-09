@@ -78,9 +78,9 @@ func main() {
 		{"hello bro", false, "Unknown"},
 	}
 	for _, c := range parseCases {
-		task, rawTime, remindAt, ok := ai.ParseReminder(c.body)
+		task, rawTime, remindAt, recurrenceType, ok := ai.ParseReminder(c.body)
 		if ok == c.expectOK {
-			out.WriteString(fmt.Sprintf("PASS ParseReminder %s: %q -> ok=%v task=%q rawTime=%q\n", c.desc, c.body, ok, task, rawTime))
+			out.WriteString(fmt.Sprintf("PASS ParseReminder %s: %q -> ok=%v task=%q rawTime=%q recurrence=%q\n", c.desc, c.body, ok, task, rawTime, recurrenceType))
 			if ok && !remindAt.IsZero() {
 				out.WriteString(fmt.Sprintf("       remindAt=%s\n", remindAt.Format("2006-01-02 15:04")))
 			}

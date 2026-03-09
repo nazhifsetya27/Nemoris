@@ -17,10 +17,30 @@ func detectReminderLanguage(body string) string {
 	return ""
 }
 
-func ParseReminder(body string) (string, string, time.Time, bool) {
+// detectRecurrenceType returns canonical recurrence type from explicit phrase match, or "" if none.
+// English: every day, every week, every month.
+// Indonesian: setiap hari, setiap minggu, setiap bulan.
+func detectRecurrenceType(contentLower string) string {
+	phrases := map[string]string{
+		"every day":    "daily",
+		"every week":   "weekly",
+		"every month":  "monthly",
+		"setiap hari":  "daily",
+		"setiap minggu": "weekly",
+		"setiap bulan":  "monthly",
+	}
+	for phrase, canonical := range phrases {
+		if strings.Contains(contentLower, phrase) {
+			return canonical
+		}
+	}
+	return ""
+}
+
+func ParseReminder(body string) (string, string, time.Time, string, bool) {
 	lang := detectReminderLanguage(body)
 	if lang == "" {
-		return "", "", time.Time{}, false
+		return "", "", time.Time{}, "", false
 	}
 
 	var prefix, timeSep, rawTimePrefix string
@@ -36,6 +56,7 @@ func ParseReminder(body string) (string, string, time.Time, bool) {
 
 	content := body[len(prefix):]
 	contentLower := strings.ToLower(content)
+	recurrenceType := detectRecurrenceType(contentLower)
 
 	if strings.Contains(contentLower, timeSep) {
 		idx := strings.Index(contentLower, timeSep)
@@ -45,12 +66,12 @@ func ParseReminder(body string) (string, string, time.Time, bool) {
 
 		parsedTime, ok := parseTomorrowTime(timePart, lang)
 		if !ok {
-			return task, rawTime, time.Time{}, false
+			return task, rawTime, time.Time{}, recurrenceType, false
 		}
-		return task, rawTime, parsedTime, true
+		return task, rawTime, parsedTime, recurrenceType, true
 	}
 
-	return content, "", time.Time{}, true
+	return content, "", time.Time{}, recurrenceType, true
 }
 
 func parseTomorrowTime(raw string, lang string) (time.Time, bool) {

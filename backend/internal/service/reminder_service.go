@@ -33,7 +33,7 @@ func ListRemindersFromMessage(from string, lang string) string {
 // Returns empty string when body is not a reminder (caller handles ping/default).
 // Caller must ensure intent is create_reminder before calling.
 func CreateReminderFromMessage(from string, body string, lang string) string {
-	task, rawTime, remindTime, ok := ai.ParseReminder(body)
+	task, rawTime, remindTime, _, ok := ai.ParseReminder(body)
 	if !ok {
 		return ""
 	}

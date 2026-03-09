@@ -4,10 +4,11 @@ import "time"
 
 // ParseResult holds the canonical structured contract shared by AI and rule parsers.
 type ParseResult struct {
-	Intent string
-	Lang   string
-	Task   string
-	Time   string
+	Intent         string
+	Lang           string
+	Task           string
+	Time           string
+	RecurrenceType string
 }
 
 // Parse is the unified parser entry point.
@@ -31,12 +32,13 @@ func Parse(body string) ParseResult {
 
 	// Step 3: Rule parser for create_reminder
 	if intent == "create_reminder" {
-		task, _, parsedTime, ok := ParseReminder(body)
+		task, _, parsedTime, recurrenceType, ok := ParseReminder(body)
 		if ok {
 			result.Task = task
 			if !parsedTime.IsZero() {
 				result.Time = parsedTime.Format(time.RFC3339)
 			}
+			result.RecurrenceType = recurrenceType
 			return result
 		}
 	}

@@ -17,12 +17,12 @@ PASS DetectIntent: "remember that I like coffee" -> store_memory
 PASS DetectIntent: "hi" -> ignore_smalltalk
 
 --- ParseReminder ---
-PASS ParseReminder English: "remind me to pay electricity tomorrow 8pm" -> ok=true task="pay electricity" rawTime="tomorrow 8pm"
+PASS ParseReminder English: "remind me to pay electricity tomorrow 8pm" -> ok=true task="pay electricity" rawTime="tomorrow 8pm" recurrence=""
        remindAt=2026-03-10 20:00
-PASS ParseReminder Indonesian: "ingatkan saya untuk bayar listrik besok jam 8 malam" -> ok=true task="bayar listrik" rawTime="besok jam 8 malam"
+PASS ParseReminder Indonesian: "ingatkan saya untuk bayar listrik besok jam 8 malam" -> ok=true task="bayar listrik" rawTime="besok jam 8 malam" recurrence=""
        remindAt=2026-03-10 20:00
-PASS ParseReminder Mixed (no 'me to' prefix): "remind aku tomorrow jam 8" -> ok=false task="" rawTime=""
-PASS ParseReminder Unknown: "hello bro" -> ok=false task="" rawTime=""
+PASS ParseReminder Mixed (no 'me to' prefix): "remind aku tomorrow jam 8" -> ok=false task="" rawTime="" recurrence=""
+PASS ParseReminder Unknown: "hello bro" -> ok=false task="" rawTime="" recurrence=""
 
 --- Summary ---
 PASS: 16  FAIL: 0
