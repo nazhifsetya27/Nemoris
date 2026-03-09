@@ -23,14 +23,15 @@ func BuildFromIntent(lang string, intent string, data map[string]string) string 
 }
 
 // Build returns localized reply text for the given lang and key.
-// Falls back to en if lang is unknown; falls back to unknown message if key is unknown.
+// Fallback chain: lang template key → english same key → english unknown.
+// No empty string may escape from this package.
 // Replaces {{task}}, {{time}}, {{count}} when data contains those keys.
 // Missing placeholders are left as-is (template stays readable).
 func Build(lang string, key string, data map[string]string) string {
 	t := getTemplates(lang)
 	msg := t[key]
 	if msg == "" {
-		msg = t["unknown"]
+		msg = En[key]
 	}
 	if msg == "" {
 		msg = En["unknown"]
@@ -38,9 +39,13 @@ func Build(lang string, key string, data map[string]string) string {
 	for k, v := range data {
 		msg = strings.ReplaceAll(msg, "{{"+k+"}}", v)
 	}
+	if msg == "" {
+		return En["unknown"]
+	}
 	return msg
 }
 
+// getTemplates returns templates for lang; unknown lang falls back to En.
 func getTemplates(lang string) map[string]string {
 	switch lang {
 	case "id":
