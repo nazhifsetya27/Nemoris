@@ -65,6 +65,10 @@ func ProcessMessage(from string, body string) string {
 		return i18n.BuildFromIntent(parsed.Lang, "store_memory", nil)
 	}
 
+	if parsed.Intent == "retrieve_memory" {
+		return RetrieveMemoryReply(from, body, parsed.Lang)
+	}
+
 	switch strings.ToLower(body) {
 	case "ping":
 		return "pong"
