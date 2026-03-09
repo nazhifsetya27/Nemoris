@@ -1,5 +1,7 @@
 package i18n
 
+import "strings"
+
 // intentToKey maps canonical intent to reply template key.
 // Unknown intents fall back to "unknown".
 var intentToKey = map[string]string{
@@ -22,7 +24,8 @@ func BuildFromIntent(lang string, intent string, data map[string]string) string 
 
 // Build returns localized reply text for the given lang and key.
 // Falls back to en if lang is unknown; falls back to unknown message if key is unknown.
-// data is reserved for future placeholder substitution (e.g. task, time).
+// Replaces {{task}}, {{time}}, {{count}} when data contains those keys.
+// Missing placeholders are left as-is (template stays readable).
 func Build(lang string, key string, data map[string]string) string {
 	t := getTemplates(lang)
 	msg := t[key]
@@ -31,6 +34,9 @@ func Build(lang string, key string, data map[string]string) string {
 	}
 	if msg == "" {
 		msg = En["unknown"]
+	}
+	for k, v := range data {
+		msg = strings.ReplaceAll(msg, "{{"+k+"}}", v)
 	}
 	return msg
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 
 	"nemoris/internal/ai"
 	"nemoris/internal/i18n"
@@ -21,7 +22,7 @@ func ListRemindersFromMessage(from string, lang string) string {
 		return "no reminders"
 	}
 
-	msg := fmt.Sprintf("you have %d reminder(s)", len(reminders))
+	msg := i18n.Build(lang, "list_reminders_success", map[string]string{"count": strconv.Itoa(len(reminders))})
 	for i, r := range reminders {
 		msg += fmt.Sprintf("\n%d. %s", i+1, r.Task)
 	}
@@ -53,5 +54,5 @@ func CreateReminderFromMessage(from string, body string, lang string) string {
 		return "internal error"
 	}
 
-	return i18n.BuildFromIntent(lang, "create_reminder", nil)
+	return i18n.BuildFromIntent(lang, "create_reminder", map[string]string{"time": rawTime})
 }
