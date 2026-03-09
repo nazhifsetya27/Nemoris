@@ -6,6 +6,17 @@ func LogInbound(message string) {
 	log.Println("[INBOUND]", message)
 }
 
+// LogInboundWithRequestID logs inbound events with optional request correlation id.
+// When requestID is non-empty, appends "request_id=<id>" for traceability.
+// Use when handler has request id from context; existing LogInbound remains for callers without it.
+func LogInboundWithRequestID(requestID, message string) {
+	if requestID != "" {
+		log.Println("[INBOUND]", message, "request_id="+requestID)
+	} else {
+		log.Println("[INBOUND]", message)
+	}
+}
+
 func LogOutbound(message string) {
 	log.Println("[OUTBOUND]", message)
 }

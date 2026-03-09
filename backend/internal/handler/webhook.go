@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 
+	"nemoris/internal/middleware"
 	"nemoris/internal/service"
 	"nemoris/internal/whatsapp"
 	"nemoris/internal/utils"
@@ -25,14 +26,15 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request) {
 	// Resolve LID to phone for storage and sending
 	msg.From = whatsapp.ResolveSendTarget(msg.From)
 
-	utils.LogInbound("From: " + msg.From + " | Body: " + msg.Body)
+	requestID := middleware.GetRequestID(r.Context())
+	utils.LogInboundWithRequestID(requestID, "From: "+msg.From+" | Body: "+msg.Body)
 
 	response := service.ProcessMessage(msg.From, msg.Body)
 
 	if response != "" && msg.From != "" {
 		result := whatsapp.SendText(msg.From, response)
 		if result.Err != nil {
-			utils.LogInbound("send failed: " + result.Err.Error())
+			utils.LogInboundWithRequestID(requestID, "send failed: "+result.Err.Error())
 		}
 	}
 
