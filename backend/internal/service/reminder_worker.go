@@ -129,6 +129,17 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 				utils.LogScheduler("failed mark sent: " + err.Error())
 			} else {
 				result.Sent++
+				if reminder.RecurrenceType != "" {
+					nextAt, calcErr := NextOccurrence(reminder.RemindAt, reminder.RecurrenceType, time.Now())
+					if calcErr != nil {
+						utils.LogScheduler("recurrence calc failed: id=" + reminder.ID + " err=" + calcErr.Error())
+					} else {
+						createErr := repository.SaveRecurringReminder(reminder.From, reminder.Task, reminder.RawTime, nextAt, reminder.RecurrenceType, reminder.RecurrenceInterval)
+						if createErr != nil {
+							utils.LogScheduler("recurrence create failed: id=" + reminder.ID + " err=" + createErr.Error())
+						}
+					}
+				}
 			}
 		}
 		utils.LogScheduler(fmt.Sprintf("profile claim=%v send=%v update=%v id=%s", claimDuration, sendDuration, updateDuration, reminder.ID))

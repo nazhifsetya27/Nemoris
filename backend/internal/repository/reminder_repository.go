@@ -27,6 +27,22 @@ func SaveReminder(from string, task string, rawTime string, remindAt time.Time) 
 	return database.DB.Create(&reminder).Error
 }
 
+// SaveRecurringReminder creates a pending reminder with recurrence fields for the next occurrence.
+func SaveRecurringReminder(from, task, rawTime string, remindAt time.Time, recurrenceType string, recurrenceInterval int) error {
+	reminder := model.Reminder{
+		From:                from,
+		Task:                task,
+		RawTime:             rawTime,
+		RemindAt:            remindAt,
+		Status:              model.ReminderPending,
+		RetryCount:          0,
+		RecurrenceType:      recurrenceType,
+		RecurrenceInterval:  recurrenceInterval,
+	}
+
+	return database.DB.Create(&reminder).Error
+}
+
 // Read
 
 func GetAllReminders(from string) ([]model.Reminder, error) {
