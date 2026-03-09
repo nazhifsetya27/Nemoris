@@ -1,0 +1,33 @@
+=== test_reply_builder.go ===
+
+--- create_reminder ---
+id: "Siap, saya ingatkan besok jam 8 malam."
+en: "Okay, I'll remind you tomorrow 8pm."
+PASS create_reminder id
+PASS create_reminder en
+
+--- list_reminders ---
+id: "Anda punya 3 pengingat."
+en: "You have 3 reminder(s)."
+PASS list_reminders id
+PASS list_reminders en
+
+--- store_memory ---
+id: "Baik, saya simpan."
+en: "Noted, I'll remember that."
+PASS store_memory id, en
+
+--- unknown language fallback ---
+xx (unknown): "Sorry, I didn't understand that."
+PASS unknown lang falls back to en
+
+--- placeholders ---
+task+time: "Okay, I'll remind you tomorrow 9am."
+time only: "Okay, I'll remind you tomorrow 9am."
+count: "You have 5 reminder(s)."
+PASS {{time}} placeholder
+PASS {{count}} placeholder
+PASS {{task}} available in Build (template may not use it)
+
+--- Summary ---
+PASS: 10  FAIL: 0

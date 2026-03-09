@@ -2,8 +2,10 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 
 	"nemoris/internal/ai"
+	"nemoris/internal/i18n"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 )
@@ -20,7 +22,7 @@ func ListRemindersFromMessage(from string, lang string) string {
 		return "no reminders"
 	}
 
-	msg := fmt.Sprintf("you have %d reminder(s)", len(reminders))
+	msg := i18n.Build(lang, "list_reminders_success", map[string]string{"count": strconv.Itoa(len(reminders))})
 	for i, r := range reminders {
 		msg += fmt.Sprintf("\n%d. %s", i+1, r.Task)
 	}
@@ -30,7 +32,7 @@ func ListRemindersFromMessage(from string, lang string) string {
 // CreateReminderFromMessage parses reminder from body, validates, saves, and returns user-facing response.
 // Returns empty string when body is not a reminder (caller handles ping/default).
 // Caller must ensure intent is create_reminder before calling.
-func CreateReminderFromMessage(from string, body string) string {
+func CreateReminderFromMessage(from string, body string, lang string) string {
 	task, rawTime, remindTime, ok := ai.ParseReminder(body)
 	if !ok {
 		return ""
@@ -52,5 +54,5 @@ func CreateReminderFromMessage(from string, body string) string {
 		return "internal error"
 	}
 
-	return "reminder noted"
+	return i18n.BuildFromIntent(lang, "create_reminder", map[string]string{"time": rawTime})
 }

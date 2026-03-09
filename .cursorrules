@@ -2,14 +2,18 @@
 
 You are working inside NEMORIS, a production-oriented WhatsApp-native AI memory assistant.
 
+---
+
 ## Core Stack
 
 - Go backend
 - WAHA Free
-- PostgreSQL
-- Redis
+- PostgreSQL 15
+- Redis 7
 - GORM
 - Docker Compose
+
+---
 
 ## Machine Constraints
 
@@ -19,30 +23,30 @@ Development machine:
 - 8GB RAM
 - ARM64
 
-Always prefer lightweight solutions.
+Always prefer lightweight implementation.
 
-Avoid introducing heavy dependencies unless clearly justified.
+Avoid heavy dependency introduction unless explicitly required.
 
 ---
 
-# Primary Engineering Principle
+## Primary Principle
 
 Production safety over speed.
 
-Never generate code that is clever but unstable.
-
 Always prefer:
 
-- explicit
-- readable
-- debuggable
-- minimal abstraction
+- explicit code
+- minimal diff
+- readable flow
+- debuggable implementation
+
+Never generate clever abstraction unless architecture already demands it.
 
 ---
 
-# Mandatory Architecture
+## Mandatory Architecture
 
-Always follow:
+Always preserve:
 
 handler → service → repository → gorm → postgres
 
@@ -51,26 +55,25 @@ Never allow:
 - handler calling repository directly
 - handler using GORM
 - service using GORM
+- scheduler containing business logic
 - multiple DB connection points
 
 ---
 
-# Folder Discipline
+## Layer Rules
 
-## cmd/
+### cmd/
 
-Only boot application.
-
-main.go must contain only:
+Only boot application:
 
 - config init
 - db init
-- migration trigger
-- dependency wiring
+- migrate
+- scheduler start
 - route registration
 - server start
 
-## handler/
+### handler/
 
 Only:
 
@@ -81,99 +84,111 @@ Only:
 
 No business logic.
 
-## service/
+### service/
 
 Only orchestration and business rules.
 
 No SQL.
 No GORM query.
 
-## repository/
+### repository/
 
-All DB access lives here.
+All DB access.
 
-All GORM query lives here.
+All GORM query.
 
-## database/
+### database/
 
-Only shared DB connection and migration entry.
+Only shared DB connection + migration.
 
-## whatsapp/
+### scheduler/
+
+Only delayed execution flow:
+
+scheduler → service → repository → whatsapp
+
+### whatsapp/
 
 Only WAHA integration.
 
-## ai/
+### ai/
 
-Only intent extraction and parsing logic.
+Only parsing, language detection, canonical intent.
 
-## scheduler/
+### i18n/
 
-Only delayed execution logic.
+Only localized reply generation.
 
-## utils/
+### model/
 
-Only generic reusable helpers.
+One domain struct per file.
 
 ---
 
-# GORM Rules
+## GORM Rules
 
-Use GORM only inside repository layer.
+Use GORM only inside repository.
 
 Allowed:
 
-- AutoMigrate() during MVP
+- AutoMigrate during current MVP phase
 
 Forbidden:
 
-- GORM usage in service
-- GORM usage in handler
+- GORM in service
+- GORM in handler
 
 Always separate:
 
-Incoming transport struct ≠ persistence model
+transport struct ≠ persistence struct
 
 Example:
 
-IncomingMessage != Message
+IncomingMessage ≠ Message
 
 ---
 
-# WhatsApp Safety Rules
+## Database Rules
 
-Before sending outbound message:
+Single connection source only:
 
-Always check:
+internal/database/postgres.go
+
+Migration only through:
+
+internal/database/migrate.go
+
+Never open DB elsewhere.
+
+---
+
+## WAHA / WhatsApp Safety
+
+Before outbound send:
+
+Always validate:
 
 - payload not empty
 - recipient not self
-- duplicate prevention if needed
+- duplicate-safe if needed
 
-Never send directly from random package.
-
-All outbound messaging must pass through:
+All outbound must pass through:
 
 internal/whatsapp/send.go
 
----
+Never bypass sender layer.
 
-# WAHA Safety
+Never trust raw WAHA payload directly.
 
-Never assume WAHA payload shape.
-
-Always inspect real payload before mapping.
-
-Create transport structs first.
-
-Normalize payload before service layer.
+Always normalize first.
 
 ---
 
-# Logging Rules
+## Logging Rules
 
-Prefer structured logs.
+Prefer existing structured logging.
 
-Use event categories:
+Use event groups:
 
 - inbound
 - outbound
@@ -181,87 +196,100 @@ Use event categories:
 - scheduler
 - ai
 
-Avoid random log.Println scattered everywhere.
+Avoid random log.Println.
 
 ---
 
-# Error Handling Rules
+## Error Rules
 
-Never ignore errors.
+Never ignore returned error.
 
-Always return explicit errors upward.
+Never panic outside startup fatal.
 
-Avoid panic unless startup fatal.
-
----
-
-# Scheduler Rules
-
-Scheduler must never contain business logic.
-
-Flow must stay:
-
-scheduler → service → repository → whatsapp
+Always bubble errors upward.
 
 ---
 
-# AI Rules
+## AI Rules
 
-AI output must always become canonical structured output.
-
-Never allow free-text AI decisions.
-
-Canonical output example:
-
-{
-"intent": "create_reminder",
-"task": "pay electricity",
-"time": "2026-03-08T20:00:00",
-"lang": "id"
-}
-
----
-
-# Multilingual Rule
-
-NEMORIS supports:
-
-- Indonesian
-- English
-
-Internal intent must remain language-neutral.
+Internal intent must always stay canonical.
 
 Allowed:
 
 create_reminder
 
+store_memory
+
+list_reminders
+
 Forbidden:
 
 buat_pengingat
 
----
+simpan_catatan
 
-# Go Style Rule
-
-Assume developer is strong in JavaScript but beginner in Go.
-
-When generating code:
-
-Always prefer simple Go.
-
-Avoid advanced abstraction too early.
-
-Explain:
-
-- why file belongs in folder
-- why pattern is safe
-- JS comparison if useful
+Canonical output must stay language-neutral.
 
 ---
 
-# Dependency Rule
+## Multilingual Rules
 
-Before adding any dependency:
+Supported now:
+
+- Indonesian
+- English
+
+Language affects only reply generation.
+
+Intent never depends on language.
+
+---
+
+## Sprint Execution Rules
+
+When given sprint task:
+
+Always do only requested epic.
+
+Never continue next epic automatically.
+
+Never modify unrelated files.
+
+Always prefer smallest safe diff.
+
+---
+
+## Required Output Rules
+
+Always respond in this order:
+
+A. Exact diff for changed files
+
+B. Why file belongs in that layer
+
+C. Safety verification against architecture
+
+D. JS analogy only if architecture decision matters
+
+---
+
+## Diff Discipline
+
+Prefer:
+
+minimal file changes
+
+Do not rewrite full file unless necessary.
+
+Respect existing naming style.
+
+Respect existing folder structure.
+
+---
+
+## Dependency Rule
+
+Before adding dependency:
 
 Explain:
 
@@ -270,60 +298,33 @@ Explain:
 3. memory impact
 4. simpler alternative
 
----
-
-# Infrastructure Rule
-
-Current safe baseline:
-
-WAHA + PostgreSQL + Redis + Go backend
-
-Do not introduce:
-
-- Kafka
-- RabbitMQ
-- microservices
-- unnecessary worker systems
-
-unless explicitly requested.
+Do not add dependency silently.
 
 ---
 
-# Code Generation Rule
+## Forbidden Behavior
 
-When editing existing code:
+Do not:
 
-Respect current architecture first.
-
-Never rewrite unrelated files unnecessarily.
-
-Generate minimal diff.
-
----
-
-# Sprint Discipline
-
-Always align implementation with current sprint.
-
-Current priority:
-
-1. stabilize current layer
-2. avoid architecture debt
-3. keep production-safe growth
+- overengineer
+- add placeholder future abstraction
+- create extra interfaces without pressure
+- rewrite stable files unnecessarily
+- start future sprint work
 
 ---
 
-# Documentation Rule
+## Documentation Rule
 
 If architecture changes:
 
 Immediately remind:
 
-"Update project instructions now."
+Update project instructions now.
 
 ---
 
-# Final Principle
+## Final Principle
 
 NEMORIS means:
 

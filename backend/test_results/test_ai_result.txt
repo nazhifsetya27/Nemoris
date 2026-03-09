@@ -1,0 +1,28 @@
+=== test_ai.go ===
+
+--- DetectLanguage ---
+PASS DetectLanguage: "remind me to pay electricity tomorrow 8pm" -> en
+PASS DetectLanguage: "ingatkan saya untuk bayar listrik besok jam 8 malam" -> id
+PASS DetectLanguage: "remind aku tomorrow jam 8" -> id
+PASS DetectLanguage: "hello bro" -> en
+
+--- DetectIntent ---
+PASS DetectIntent: "remind me to pay electricity tomorrow 8pm" -> create_reminder
+PASS DetectIntent: "ingatkan saya untuk bayar listrik besok jam 8 malam" -> create_reminder
+PASS DetectIntent: "remind aku tomorrow jam 8" -> create_reminder
+PASS DetectIntent: "hello bro" -> unknown
+PASS DetectIntent: "list my tasks" -> list_reminders
+PASS DetectIntent: "tampilkan tugas saya" -> list_reminders
+PASS DetectIntent: "remember that I like coffee" -> store_memory
+PASS DetectIntent: "hi" -> ignore_smalltalk
+
+--- ParseReminder ---
+PASS ParseReminder English: "remind me to pay electricity tomorrow 8pm" -> ok=true task="pay electricity" rawTime="tomorrow 8pm"
+       remindAt=2026-03-10 20:00
+PASS ParseReminder Indonesian: "ingatkan saya untuk bayar listrik besok jam 8 malam" -> ok=true task="bayar listrik" rawTime="besok jam 8 malam"
+       remindAt=2026-03-10 20:00
+PASS ParseReminder Mixed (no 'me to' prefix): "remind aku tomorrow jam 8" -> ok=false task="" rawTime=""
+PASS ParseReminder Unknown: "hello bro" -> ok=false task="" rawTime=""
+
+--- Summary ---
+PASS: 16  FAIL: 0

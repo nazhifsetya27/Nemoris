@@ -1,0 +1,12 @@
+=== test_repository.go ===
+
+PASS SaveReminder
+PASS GetDueReminders (count=0)
+PASS MarkReminderRetrying
+PASS MarkReminderFailed
+PASS reminder in failed list
+PASS ClaimOneDueReminder
+PASS MarkReminderSent
+
+--- Summary ---
+PASS: 7  FAIL: 0

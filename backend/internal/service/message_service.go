@@ -5,6 +5,8 @@ import (
 
 	"nemoris/internal/ai"
 	"nemoris/internal/config"
+	"nemoris/internal/i18n"
+	"nemoris/internal/model"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 )
@@ -41,7 +43,7 @@ func ProcessMessage(from string, body string) string {
 			}
 			return "please specify reminder time"
 		}
-		if response := CreateReminderFromMessage(from, body); response != "" {
+		if response := CreateReminderFromMessage(from, body, parsed.Lang); response != "" {
 			return response
 		}
 	}
@@ -50,10 +52,23 @@ func ProcessMessage(from string, body string) string {
 		return ListRemindersFromMessage(from, parsed.Lang)
 	}
 
+	if parsed.Intent == "store_memory" {
+		m := model.Memory{
+			From:    from,
+			Content: body,
+			Lang:    parsed.Lang,
+		}
+		if err := repository.SaveMemory(m); err != nil {
+			utils.LogDB("Memory save failed: " + err.Error())
+			return "internal error"
+		}
+		return i18n.BuildFromIntent(parsed.Lang, "store_memory", nil)
+	}
+
 	switch strings.ToLower(body) {
 	case "ping":
 		return "pong"
 	default:
-		return "message received"
+		return i18n.BuildFromIntent(parsed.Lang, "unknown", nil)
 	}
 }

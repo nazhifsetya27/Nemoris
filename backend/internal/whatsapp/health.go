@@ -32,3 +32,27 @@ func CheckWAHA() bool {
 
 	return resp.StatusCode == http.StatusOK
 }
+
+// CheckWAHALatency performs a lightweight GET to WAHA /api/sessions.
+// Returns (ok, latency). Use for health checks that need latency.
+func CheckWAHALatency() (bool, time.Duration) {
+	url := strings.TrimSuffix(config.App.WAHABaseURL, "/") + "/api/sessions"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, 0
+	}
+	req.Header.Set("Accept", "application/json")
+	if config.App.WAHAAPIKey != "" {
+		req.Header.Set("X-Api-Key", config.App.WAHAAPIKey)
+	}
+
+	start := time.Now()
+	resp, err := healthClient.Do(req)
+	latency := time.Since(start)
+	if err != nil {
+		return false, latency
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK, latency
+}

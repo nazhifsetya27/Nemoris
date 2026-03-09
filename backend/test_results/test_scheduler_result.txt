@@ -1,0 +1,17 @@
+=== test_scheduler.go ===
+
+--- Before ProcessDueReminders ---
+id=b62c2e6e-e5b9-4a7b-8147-a9bbf07556ea status=pending retry_count=0
+
+--- ProcessDueReminders result ---
+Checked=3 Due=3 Sent=0 Retry=2 Failed=1
+PASS due reminder found and processed
+
+--- After state ---
+id=b62c2e6e-e5b9-4a7b-8147-a9bbf07556ea status=failed retry_count=3 last_error="status 500: 2 UNKNOWN: failed to get device list: failed to send usync query: info query timed out"
+PASS reminder in retry/failed (WAHA may be down)
+
+PASS claim safety: nil when no due reminders
+
+--- Summary ---
+PASS: 3  FAIL: 0
