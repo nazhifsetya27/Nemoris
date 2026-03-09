@@ -1,11 +1,13 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"nemoris/internal/model"
+	"nemoris/internal/queue"
 	"nemoris/internal/redis"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
@@ -81,14 +83,73 @@ type ProcessDueRemindersResult struct {
 	ClaimConflicts int
 }
 
-// ProcessDueReminders claims due reminders one-by-one (transaction-safe), sends them, and returns execution counts.
+// ProcessDueReminders runs hybrid flow: detect → enqueue → process from queue.
+// Falls back to claim loop when queue unavailable.
 func ProcessDueReminders() (ProcessDueRemindersResult, error) {
+	due, err := repository.GetDueReminders()
+	if err != nil {
+		return ProcessDueRemindersResult{}, err
+	}
+	if len(due) == 0 {
+		return processViaClaimLoop()
+	}
+
+	// Try queue path; fallback only when first enqueue fails (no partial enqueue)
+	if err := queue.Enqueue(due[0].ID); err != nil {
+		utils.LogSchedulerWarn("queue enqueue failed, falling back to claim loop: " + err.Error())
+		return processViaClaimLoop()
+	}
+	for _, d := range due[1:] {
+		_ = queue.Enqueue(d.ID)
+	}
+	return processFromQueue()
+}
+
+// processFromQueue dequeues and executes. Execution reads through queue path.
+func processFromQueue() (ProcessDueRemindersResult, error) {
 	result := ProcessDueRemindersResult{}
 
 	for {
-		t0 := time.Now()
+		reminderID, err := queue.Dequeue()
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				break
+			}
+			utils.LogSchedulerWarn("queue dequeue failed: " + err.Error())
+			break
+		}
+
+		reminder, err := repository.ClaimDueReminderByID(reminderID)
+		if err != nil {
+			return result, err
+		}
+		if reminder == nil {
+			continue
+		}
+
+		acquired, lockErr := queue.TryLock(reminder.ID)
+		if lockErr != nil {
+			utils.LogSchedulerWarn("queue lock failed, proceeding (fallback): " + lockErr.Error())
+		}
+		if !acquired && lockErr == nil {
+			utils.LogSchedulerWarn("Redis lock held for id=" + reminder.ID + ", proceeding (fallback)")
+		}
+
+		result.Checked++
+		result.Due++
+		executeOneReminder(reminder, &result)
+		_ = queue.Release(reminder.ID)
+	}
+
+	return result, nil
+}
+
+// processViaClaimLoop is the fallback path when queue unavailable.
+func processViaClaimLoop() (ProcessDueRemindersResult, error) {
+	result := ProcessDueRemindersResult{}
+
+	for {
 		reminder, err := repository.ClaimOneDueReminder()
-		claimDuration := time.Since(t0)
 		if err != nil {
 			return result, err
 		}
@@ -96,63 +157,57 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 			break
 		}
 
-		result.Checked++
-		result.Due++
-		utils.LogScheduler("due reminder found: " + reminder.Task)
-
 		acquired, _ := redis.TryLock(reminder.ID)
 		if !acquired {
 			utils.LogSchedulerWarn("Redis lock held for id=" + reminder.ID + ", proceeding (fallback)")
 		}
-		defer redis.Release(reminder.ID)
 
-		text := fmt.Sprintf("Reminder: %s", reminder.Task)
-
-		t1 := time.Now()
-		sendResult := whatsapp.SendText(reminder.From, text)
-		sendDuration := time.Since(t1)
-
-		var updateDuration time.Duration
-		if sendResult.Err != nil {
-			reason := sendResult.Err.Error()
-			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=" + reason)
-			t2 := time.Now()
-			ft := classifyFailure(sendResult.Err, sendResult.Accepted)
-			handleRetry(reminder.ID, reminder.RetryCount, reason, ft)
-			updateDuration = time.Since(t2)
-			trackRetryOrFailed(reminder.RetryCount, &result)
-		} else if !sendResult.Accepted {
-			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=send rejected")
-			t2 := time.Now()
-			ft := classifyFailure(nil, false)
-			handleRetry(reminder.ID, reminder.RetryCount, "send rejected", ft)
-			updateDuration = time.Since(t2)
-			trackRetryOrFailed(reminder.RetryCount, &result)
-		} else {
-			t2 := time.Now()
-			err = repository.MarkReminderSent(reminder.ID)
-			updateDuration = time.Since(t2)
-			if err != nil {
-				utils.LogScheduler("failed mark sent: " + err.Error())
-			} else {
-				result.Sent++
-				if reminder.RecurrenceType != "" {
-					nextAt, calcErr := NextOccurrence(reminder.RemindAt, reminder.RecurrenceType, time.Now())
-					if calcErr != nil {
-						utils.LogScheduler("recurrence calc failed: id=" + reminder.ID + " err=" + calcErr.Error())
-					} else {
-						createErr := repository.SaveRecurringReminder(reminder.From, reminder.Task, reminder.RawTime, nextAt, reminder.RecurrenceType, reminder.RecurrenceInterval)
-						if createErr != nil {
-							utils.LogScheduler("recurrence create failed: id=" + reminder.ID + " err=" + createErr.Error())
-						}
-					}
-				}
-			}
-		}
-		utils.LogScheduler(fmt.Sprintf("profile claim=%v send=%v update=%v id=%s", claimDuration, sendDuration, updateDuration, reminder.ID))
+		result.Checked++
+		result.Due++
+		executeOneReminder(reminder, &result)
+		redis.Release(reminder.ID)
 	}
 
 	return result, nil
+}
+
+func executeOneReminder(reminder *model.Reminder, result *ProcessDueRemindersResult) {
+	utils.LogScheduler("due reminder found: " + reminder.Task)
+
+	text := fmt.Sprintf("Reminder: %s", reminder.Task)
+	sendResult := whatsapp.SendText(reminder.From, text)
+
+	if sendResult.Err != nil {
+		reason := sendResult.Err.Error()
+		utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=" + reason)
+		ft := classifyFailure(sendResult.Err, sendResult.Accepted)
+		handleRetry(reminder.ID, reminder.RetryCount, reason, ft)
+		trackRetryOrFailed(reminder.RetryCount, result)
+		return
+	}
+	if !sendResult.Accepted {
+		utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=send rejected")
+		ft := classifyFailure(nil, false)
+		handleRetry(reminder.ID, reminder.RetryCount, "send rejected", ft)
+		trackRetryOrFailed(reminder.RetryCount, result)
+		return
+	}
+
+	if err := repository.MarkReminderSent(reminder.ID); err != nil {
+		utils.LogScheduler("failed mark sent: " + err.Error())
+		return
+	}
+	result.Sent++
+	if reminder.RecurrenceType != "" {
+		nextAt, calcErr := NextOccurrence(reminder.RemindAt, reminder.RecurrenceType, time.Now())
+		if calcErr != nil {
+			utils.LogScheduler("recurrence calc failed: id=" + reminder.ID + " err=" + calcErr.Error())
+			return
+		}
+		if createErr := repository.SaveRecurringReminder(reminder.From, reminder.Task, reminder.RawTime, nextAt, reminder.RecurrenceType, reminder.RecurrenceInterval); createErr != nil {
+			utils.LogScheduler("recurrence create failed: id=" + reminder.ID + " err=" + createErr.Error())
+		}
+	}
 }
 
 // trackRetryOrFailed increments Retry or Failed based on retry count.

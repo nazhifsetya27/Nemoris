@@ -9,10 +9,13 @@ import (
 	"nemoris/internal/config"
 	"nemoris/internal/utils"
 
-	"github.com/redis/go-redis/v9"
+	rd "github.com/redis/go-redis/v9"
 )
 
-var client *redis.Client
+var client *rd.Client
+
+// Nil is re-exported from go-redis for empty queue detection (errors.Is(err, redis.Nil)).
+var Nil = rd.Nil
 
 // ErrRedisUnavailable is returned when Redis client is nil (not connected).
 var ErrRedisUnavailable = errors.New("redis unavailable")
@@ -31,7 +34,7 @@ func Init() {
 	}
 
 	addr := fmt.Sprintf("%s:%s", config.App.RedisHost, config.App.RedisPort)
-	client = redis.NewClient(&redis.Options{
+	client = rd.NewClient(&rd.Options{
 		Addr:         addr,
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 3 * time.Second,

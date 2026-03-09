@@ -143,6 +143,46 @@ func ClaimOneDueReminder() (*model.Reminder, error) {
 	return &reminder, nil
 }
 
+// ClaimDueReminderByID atomically claims a specific reminder by ID if still due.
+// Returns (nil, nil) when already claimed, not due, or not found.
+func ClaimDueReminderByID(id string) (*model.Reminder, error) {
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var reminder model.Reminder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND remind_at <= ? AND status IN ?", id, time.Now(), []string{model.ReminderPending, model.ReminderRetrying}).
+		First(&reminder).Error
+	if err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	err = tx.Model(&reminder).Update("status", model.ReminderProcessing).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	utils.LogDB("reminder claimed by id id=" + reminder.ID)
+	return &reminder, nil
+}
+
 func MarkReminderSent(id string) error {
 	now := time.Now()
 
