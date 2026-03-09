@@ -162,13 +162,26 @@ func MarkReminderFailed(id string, retryCount int, lastError string, failureType
 		}).Error
 }
 
-func GetFailedReminders(from string) ([]model.Reminder, error) {
+func GetFailedReminders(from, status, failureType, date string) ([]model.Reminder, error) {
 	var reminders []model.Reminder
 
 	query := database.DB.Where("status = ?", model.ReminderFailed).Order("created_at desc")
 
 	if from != "" {
 		query = query.Where(`"from" = ?`, from)
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if failureType != "" {
+		query = query.Where("failure_type = ?", failureType)
+	}
+	if date != "" {
+		if t, err := time.Parse("2006-01-02", date); err == nil {
+			start := t
+			end := t.AddDate(0, 0, 1)
+			query = query.Where("created_at >= ? AND created_at < ?", start, end)
+		}
 	}
 
 	err := query.Find(&reminders).Error

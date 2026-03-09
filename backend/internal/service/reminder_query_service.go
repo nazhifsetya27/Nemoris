@@ -16,6 +16,7 @@ func ListPendingReminders() ([]model.Reminder, error) {
 }
 
 // ListFailedReminders returns reminders that failed delivery, ordered newest first.
-func ListFailedReminders(from string) ([]model.Reminder, error) {
-	return repository.GetFailedReminders(from)
+// Filters (status, failure_type, date) are optional; empty strings are ignored.
+func ListFailedReminders(from, status, failureType, date string) ([]model.Reminder, error) {
+	return repository.GetFailedReminders(from, status, failureType, date)
 }

@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// Verify failed state
-	failedList, _ := repository.GetFailedReminders(testSender)
+	failedList, _ := repository.GetFailedReminders(testSender, "", "", "")
 	found := false
 	for _, r := range failedList {
 		if r.ID == testReminder.ID {
