@@ -57,27 +57,22 @@ type ProcessDueRemindersResult struct {
 	ClaimConflicts int
 }
 
-// ProcessDueReminders fetches due reminders, sends them, and returns execution counts.
+// ProcessDueReminders claims due reminders one-by-one (transaction-safe), sends them, and returns execution counts.
 func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 	result := ProcessDueRemindersResult{}
 
-	reminders, err := repository.GetDueReminders()
-	if err != nil {
-		return result, err
-	}
-
-	result.Checked = len(reminders)
-	result.Due = len(reminders)
-
-	for _, reminder := range reminders {
-		utils.LogScheduler("due reminder found: " + reminder.Task)
-
-		claimed := repository.ClaimReminder(reminder.ID)
-		if !claimed {
-			utils.LogScheduler("already claimed: " + reminder.Task)
-			result.ClaimConflicts++
-			continue
+	for {
+		reminder, err := repository.ClaimOneDueReminder()
+		if err != nil {
+			return result, err
 		}
+		if reminder == nil {
+			break
+		}
+
+		result.Checked++
+		result.Due++
+		utils.LogScheduler("due reminder found: " + reminder.Task)
 
 		text := fmt.Sprintf("Reminder: %s", reminder.Task)
 

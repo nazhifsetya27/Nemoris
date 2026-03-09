@@ -1,10 +1,15 @@
 package repository
 
 import (
+	"errors"
 	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"nemoris/internal/database"
 	"nemoris/internal/model"
+	"nemoris/internal/utils"
 )
 
 // Create
@@ -78,12 +83,47 @@ func CountOverdueReminders() (int, error) {
 
 // Lifecycle Updates
 
-func ClaimReminder(id string) bool {
-	result := database.DB.Model(&model.Reminder{}).
-		Where("id = ? AND status IN ?", id, []string{model.ReminderPending, model.ReminderRetrying}).
-		Update("status", model.ReminderProcessing)
+// ClaimOneDueReminder atomically selects one due reminder, locks it with FOR UPDATE SKIP LOCKED,
+// updates status to processing, and returns it. Returns (nil, nil) when no due reminder exists.
+// Safe for concurrent workers and restart overlap.
+func ClaimOneDueReminder() (*model.Reminder, error) {
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
-	return result.RowsAffected == 1
+	var reminder model.Reminder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("remind_at <= ? AND status IN ?", time.Now(), []string{model.ReminderPending, model.ReminderRetrying}).
+		Order("remind_at asc").
+		Limit(1).
+		First(&reminder).Error
+	if err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	err = tx.Model(&reminder).Update("status", model.ReminderProcessing).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	utils.LogDB("reminder claimed safely id=" + reminder.ID)
+	return &reminder, nil
 }
 
 func MarkReminderSent(id string) error {
