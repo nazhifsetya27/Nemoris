@@ -2,10 +2,20 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"hash/fnv"
 	"time"
+
+	"nemoris/internal/utils"
 )
 
 const providerTimeout = 3 * time.Second
+
+func promptHash(body string) string {
+	h := fnv.New32a()
+	h.Write([]byte(body))
+	return fmt.Sprintf("%08x", h.Sum32())
+}
 
 // Result holds the canonical structured contract for external AI responses.
 // Matches the shape expected by the parser layer: intent, task, time, lang.
@@ -32,7 +42,11 @@ func ZeroResult() Result {
 // PrepareExternalCall prepares an external AI call and returns a stub-safe result.
 // Enforces strict timeout; timeout failure returns ZeroResult().
 // No real provider integration yet. No HTTP client, no SDK.
+// Logs audit fields: prompt_hash, latency, fallback_reason. Never logs raw prompt.
 func PrepareExternalCall(body string) (Result, error) {
+	start := time.Now()
+	ph := promptHash(body)
+
 	ctx, cancel := context.WithTimeout(context.Background(), providerTimeout)
 	defer cancel()
 
@@ -44,8 +58,10 @@ func PrepareExternalCall(body string) (Result, error) {
 
 	select {
 	case r := <-resultCh:
+		utils.LogAI(fmt.Sprintf("provider fallback invoked prompt_hash=%s latency=%s fallback_reason=stub", ph, time.Since(start)))
 		return r, nil
 	case <-ctx.Done():
+		utils.LogAI(fmt.Sprintf("provider fallback invoked prompt_hash=%s latency=%s fallback_reason=timeout", ph, time.Since(start)))
 		return ZeroResult(), ctx.Err()
 	}
 }
