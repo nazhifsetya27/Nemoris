@@ -1,6 +1,10 @@
 package ai
 
-import "time"
+import (
+	"time"
+
+	"nemoris/internal/ai/provider"
+)
 
 // ParseResult holds the canonical structured contract shared by AI and rule parsers.
 type ParseResult struct {
@@ -48,8 +52,21 @@ func Parse(body string) ParseResult {
 }
 
 // fallbackParse is the fallback path when rule parsing fails.
-// Currently a placeholder: no external AI, no HTTP calls.
+// For unknown intent only: calls provider stub. Known intents keep rule result.
 func fallbackParse(body string, intent string, lang string) ParseResult {
+	if intent == "unknown" {
+		pr, err := provider.PrepareExternalCall(body)
+		if err != nil {
+			return ParseResult{Intent: "unknown", Lang: lang, Task: "", Time: ""}
+		}
+		return ParseResult{
+			Intent:         pr.Intent,
+			Lang:          pr.Lang,
+			Task:          pr.Task,
+			Time:          pr.Time,
+			RecurrenceType: pr.RecurrenceType,
+		}
+	}
 	return ParseResult{
 		Intent: intent,
 		Lang:   lang,
