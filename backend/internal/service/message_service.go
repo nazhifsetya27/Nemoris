@@ -5,6 +5,7 @@ import (
 
 	"nemoris/internal/ai"
 	"nemoris/internal/config"
+	"nemoris/internal/i18n"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 )
@@ -41,7 +42,7 @@ func ProcessMessage(from string, body string) string {
 			}
 			return "please specify reminder time"
 		}
-		if response := CreateReminderFromMessage(from, body); response != "" {
+		if response := CreateReminderFromMessage(from, body, parsed.Lang); response != "" {
 			return response
 		}
 	}
@@ -54,6 +55,6 @@ func ProcessMessage(from string, body string) string {
 	case "ping":
 		return "pong"
 	default:
-		return "message received"
+		return i18n.Build(parsed.Lang, "unknown", nil)
 	}
 }

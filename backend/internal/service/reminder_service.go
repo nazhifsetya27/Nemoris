@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"nemoris/internal/ai"
+	"nemoris/internal/i18n"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 )
@@ -30,7 +31,7 @@ func ListRemindersFromMessage(from string, lang string) string {
 // CreateReminderFromMessage parses reminder from body, validates, saves, and returns user-facing response.
 // Returns empty string when body is not a reminder (caller handles ping/default).
 // Caller must ensure intent is create_reminder before calling.
-func CreateReminderFromMessage(from string, body string) string {
+func CreateReminderFromMessage(from string, body string, lang string) string {
 	task, rawTime, remindTime, ok := ai.ParseReminder(body)
 	if !ok {
 		return ""
@@ -52,5 +53,5 @@ func CreateReminderFromMessage(from string, body string) string {
 		return "internal error"
 	}
 
-	return "reminder noted"
+	return i18n.Build(lang, "create_reminder_success", nil)
 }
