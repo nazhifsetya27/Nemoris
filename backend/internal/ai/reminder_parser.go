@@ -17,12 +17,31 @@ func detectReminderLanguage(body string) string {
 	return ""
 }
 
+// ambiguousRecurrenceModifiers: presence of any blocks recurrence (e.g. "sometimes every month", "maybe every week", "tiap bulan mungkin", "kadang setiap minggu").
+var ambiguousRecurrenceModifiers = []string{
+	"sometimes", "maybe",
+	"mungkin", "kadang",
+}
+
+func isAmbiguousRecurrence(contentLower string) bool {
+	for _, m := range ambiguousRecurrenceModifiers {
+		if strings.Contains(contentLower, m) {
+			return true
+		}
+	}
+	return false
+}
+
 // detectRecurrenceType returns canonical recurrence type from explicit phrase match, or "" if none.
+// Ambiguous content (e.g. "sometimes every month") returns "" for safety.
 // English: every day, every week, every month.
 // Indonesian: setiap hari, setiap minggu, setiap bulan.
 func detectRecurrenceType(contentLower string) string {
+	if isAmbiguousRecurrence(contentLower) {
+		return ""
+	}
 	phrases := map[string]string{
-		"every day":    "daily",
+		"every day":     "daily",
 		"every week":   "weekly",
 		"every month":  "monthly",
 		"setiap hari":  "daily",
