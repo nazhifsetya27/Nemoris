@@ -1,5 +1,12 @@
 package provider
 
+import (
+	"context"
+	"time"
+)
+
+const providerTimeout = 3 * time.Second
+
 // Result holds the canonical structured contract for external AI responses.
 // Matches the shape expected by the parser layer: intent, task, time, lang.
 // Contract: explicit typed struct only. No raw prose. No map[string]interface{}.
@@ -23,8 +30,22 @@ func ZeroResult() Result {
 }
 
 // PrepareExternalCall prepares an external AI call and returns a stub-safe result.
+// Enforces strict timeout; timeout failure returns ZeroResult().
 // No real provider integration yet. No HTTP client, no SDK.
-// Always returns typed Result. Future: will accept body, call external API, parse into Result.
 func PrepareExternalCall(body string) (Result, error) {
-	return ZeroResult(), nil
+	ctx, cancel := context.WithTimeout(context.Background(), providerTimeout)
+	defer cancel()
+
+	resultCh := make(chan Result, 1)
+	go func() {
+		// Stub: no real I/O yet. Future: HTTP call, parse into Result.
+		resultCh <- ZeroResult()
+	}()
+
+	select {
+	case r := <-resultCh:
+		return r, nil
+	case <-ctx.Done():
+		return ZeroResult(), ctx.Err()
+	}
 }
