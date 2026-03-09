@@ -1,5 +1,7 @@
 # Nemoris — Architecture & Technical Documentation
 
+*Last updated: 2026-03-08*
+
 ## Overview
 
 **Nemoris** is a WhatsApp-native AI memory assistant built to help users store reminders, tasks, notes, and schedules through natural conversation.
@@ -25,12 +27,13 @@ NEMORIS supports **2 languages from MVP stage**: Indonesian (`id`) and English (
 ## Core MVP Features
 
 - WhatsApp text message reminder creation
-- Natural language reminder parsing
+- Natural language reminder parsing (rule-based)
 - Scheduled reminder delivery
-- Persistent memory storage
+- Persistent memory storage (PostgreSQL)
 - Task listing
-- Voice note transcription
-- AI summarization
+- Duplicate message prevention
+- Self-message filtering
+- LID (Linked ID) to phone resolution for sending
 
 ## Example User Interactions
 
@@ -41,21 +44,17 @@ remind me to pay electricity tomorrow 8pm
 ```
 
 ```text
-buy milk every monday
-```
-
-```text
-remember my passport expires in december
-```
-
-```text
-what are my pending tasks?
+list reminders
 ```
 
 **Indonesian:**
 
 ```text
 ingatkan saya untuk bayar listrik besok jam 8 malam
+```
+
+```text
+daftar pengingat
 ```
 
 Both languages map internally to the same canonical intent.
@@ -71,111 +70,137 @@ A[WhatsApp User] --> B[WAHA WhatsApp Gateway]
 
 B --> C[Webhook API - Go Backend]
 
-C --> D[Message Processor]
+C --> D[Middleware: Recover, RateLimit, WebhookAuth]
 
-D --> E[Language Detection]
+D --> E[Webhook Handler]
 
-E --> F[Intent Parsing]
+E --> F[Message Service]
 
-F --> G[Canonical Internal Intent]
+F --> G[AI Parser - Intent & Language]
 
-G --> H[Reminder Service]
+G --> H[Canonical Internal Intent]
 
-H --> I[(PostgreSQL)]
+H --> I[Reminder Service / Message Repository]
 
-H --> J[(Redis Queue)]
+I --> J[(PostgreSQL)]
 
-J --> K[Worker Scheduler]
+F --> K[In-Process Scheduler - 60s Ticker]
 
-K --> L[Localized Reply Builder]
+K --> L[Reminder Worker Service]
 
-L --> M[Reminder Sender]
+L --> M[Repository: GetDueReminders]
 
-M --> B
+M --> N[WhatsApp Send]
+
+N --> B
 ```
 
 **Message flow with multilingual support:**
 
 ```mermaid
 flowchart TD
-A[Incoming WhatsApp Message] --> B[Language Detection]
-B --> C[Intent Parsing]
-C --> D[Canonical Internal Intent]
-D --> E[Reminder Service]
-E --> F[Localized Reply Builder]
+A[Incoming WhatsApp Message] --> B[Extract from WAHA Payload]
+B --> C[Duplicate Check]
+C --> D[Save Message]
+D --> E[AI: Intent + Language Detection]
+E --> F[Canonical Internal Intent]
+F --> G[Reminder Service / List Service]
+G --> H[WhatsApp Send Reply]
 ```
 
-- Language Detection runs before Intent Parsing.
+- Language Detection runs inside AI layer before Intent Parsing.
 - Canonical Intent remains language-independent.
 
 ---
 
 # 3. Core Architecture Layers
 
-## Messaging Layer
+## Messaging Layer (`internal/whatsapp/`)
 
-Responsible for WhatsApp communication.
+Responsible for WhatsApp communication via WAHA.
 
 ### Technology
 
-- WAHA Free Edition
+- WAHA Free Edition (devlikeapro/waha)
 - Dockerized session management
 - Webhook-based event delivery
 
 ### Responsibilities
 
-- Session QR login
-- Incoming message delivery
-- Outgoing text/media sending
+- Session QR login (WAHA-managed)
+- Incoming message extraction (`payload.go` — `ExtractMessageFromWAHA`)
+- Outbound text sending (`send.go` — `SendText`)
+- LID-to-phone resolution (`lid.go` — `ResolveSendTarget`, `ResolveLIDToPhone`)
+- WAHA health check (`health.go` — `CheckWAHA`)
+
+### Outbound Safety (in `send.go`)
+
+- Empty message blocked
+- Self-message blocked (BOT_NUMBER)
+- Duplicate outbound suppression (10s window)
+- Outbound pacing (300ms + random 0–600ms)
+- Invalid chatId rejected
 
 ---
 
 ## Backend Layer
 
-Built in Go.
+Built in Go using **standard net/http** (no Gin).
 
 ### Technology
 
-- Go 1.22+
-- Gin Framework
-- REST API
+- Go 1.23+
+- Standard library `net/http`
 - JSON Webhooks
+- godotenv for config
 
 ### Responsibilities
 
 - Receive webhook events
-- Validate incoming payloads
+- Validate incoming payloads (middleware)
 - Route messages
 - Trigger AI parsing
-- Persist tasks
+- Persist tasks via repository
 
 ---
 
-## Intelligence Layer
+## Middleware Layer (`internal/middleware/`)
 
-Transforms human language into structured commands.
+| Middleware    | Purpose                                      | Applied To   |
+|---------------|----------------------------------------------|--------------|
+| Recover       | Panic recovery, returns 500                   | All routes   |
+| RateLimit     | 10 requests / 60s per IP, returns 429         | Webhook only |
+| WebhookAuth   | X-Webhook-Secret validation, returns 401     | Webhook only |
 
-### Technology Options
+Dev fallback: `?token=` query param when `APP_ENV=dev`.
 
-- OpenAI API
-- Ollama local model
-- Claude API
+---
+
+## Intelligence Layer (`internal/ai/`)
+
+Transforms human language into structured commands. **Rule-based only** (no external LLM in MVP).
+
+### Technology
+
+- Keyword-based intent detection
+- Heuristic language detection
+- Rule-based time parsing
 
 ### Responsibilities
 
-- Intent detection
-- Time extraction
-- Entity extraction
-- Task classification
+- Intent detection (`intent.go` — `DetectIntent`)
+- Language detection (`language.go` — `DetectLanguage`)
+- Time extraction (`reminder_parser.go` — `ParseReminder`)
+- Task extraction
 
 ### Multilingual Contract
 
-The AI parser must return:
+The AI parser returns:
 
 - `language` — detected source language (`id` or `en`)
 - `intent` — canonical intent (language-independent)
 - `task` — extracted task text
-- `time` — extracted timestamp
+- `time` — extracted timestamp (RFC3339)
 
 Canonical output is independent of source language.
 
@@ -183,34 +208,36 @@ Canonical output is independent of source language.
 
 ## Persistence Layer
 
-### PostgreSQL
+### PostgreSQL (GORM)
 
 Stores:
 
-- reminders
-- tasks
-- user memory
-- message history
+- `messages` — inbound message history (duplicate check)
+- `reminders` — tasks, remind_at, status, retry metadata
 
 ### Redis
 
-Stores:
-
-- delayed jobs
-- retry queues
-- event scheduling
+- Present in Docker Compose for future use.
+- **Not used in current codebase** — scheduler uses in-process ticker.
 
 ---
 
-## Worker Layer
+## Scheduler Layer (`internal/scheduler/`)
 
-Executes background jobs.
+**In-process ticker** — no separate worker container, no Redis queue.
 
 ### Responsibilities
 
-- Trigger reminders
-- Retry failed deliveries
-- Run recurring schedules
+- Run every 60 seconds
+- Call `service.ProcessDueReminders()`
+- Reminder worker logic lives in `service/reminder_worker.go`
+
+### Reminder Lifecycle
+
+```text
+pending → processing → sent
+pending → processing → retrying (up to 3) → failed
+```
 
 ---
 
@@ -222,25 +249,38 @@ flowchart LR
 A[Docker Host]
 
 A --> B[WAHA Container]
-A --> C[Go API Container]
-A --> D[Postgres Container]
-A --> E[Redis Container]
-A --> F[Worker Container]
+A --> C[Postgres Container]
+A --> D[Redis Container]
+
+A --> E[Go API - Host or Container]
 ```
+
+**Dev:** Backend runs on host (air/go run). Postgres, Redis, WAHA in containers.
+
+**Prod:** Backend runs as `nemoris-api` container.
 
 ---
 
 # 5. Docker Compose Design
 
-## Services
+## Dev (`deployments/docker-compose.dev.yml`)
 
-| Service  | Purpose            |
-| -------- | ------------------ |
-| waha     | WhatsApp gateway   |
-| backend  | Main API           |
-| postgres | Persistent storage |
-| redis    | Queue              |
-| worker   | Reminder scheduler |
+| Service  | Purpose            | Port |
+| -------- | ------------------ | ---- |
+| postgres | Persistent storage  | 5432 |
+| redis    | Future queue        | 6379 |
+| waha     | WhatsApp gateway    | 3000 |
+
+Backend runs locally.
+
+## Prod (`deployments/docker-compose.prod.yml`)
+
+| Service  | Purpose            | Port |
+| -------- | ------------------ | ---- |
+| postgres | Persistent storage  | -    |
+| redis    | Future queue        | -    |
+| waha     | WhatsApp gateway    | 3000 |
+| backend  | Main API (nemoris-api) | 8080 |
 
 ---
 
@@ -254,22 +294,33 @@ sequenceDiagram
 participant User
 participant WAHA
 participant API
-participant LangDetect
-participant Parser
-participant DB
-participant Queue
-participant ReplyBuilder
+participant Middleware
+participant Handler
+participant MessageService
+participant AI
+participant Repository
+participant WhatsApp
 
 User->>WAHA: Send WhatsApp message
 WAHA->>API: Webhook event
-API->>LangDetect: Detect language (id/en)
-LangDetect->>Parser: Parse natural language
-Parser->>API: Canonical Intent (JSON)
-API->>DB: Save reminder
-API->>Queue: Schedule task
-API->>ReplyBuilder: Build localized reply
-ReplyBuilder->>WAHA: Confirmation reply
-WAHA->>User: Reminder noted / Pengingat disimpan
+API->>Middleware: Recover, RateLimit, WebhookAuth
+Middleware->>Handler: WebhookHandler
+Handler->>Handler: ExtractMessageFromWAHA, ResolveSendTarget
+Handler->>MessageService: ProcessMessage
+MessageService->>Repository: FindRecentDuplicate, SaveMessage
+MessageService->>AI: Parse (intent, lang, task, time)
+alt create_reminder
+  MessageService->>MessageService: CreateReminderFromMessage
+  MessageService->>Repository: SaveReminder
+end
+alt list_reminders
+  MessageService->>MessageService: ListRemindersFromMessage
+  MessageService->>Repository: GetAllReminders
+end
+MessageService->>Handler: response text
+Handler->>WhatsApp: SendText
+WhatsApp->>WAHA: POST /api/sendText
+WAHA->>User: Reply
 ```
 
 ---
@@ -279,47 +330,113 @@ WAHA->>User: Reminder noted / Pengingat disimpan
 ```mermaid
 sequenceDiagram
 
-participant Worker
-participant Redis
-participant DB
+participant Scheduler
+participant Service
+participant Repository
 participant WAHA
 participant User
 
-Worker->>Redis: Pull due job
-Worker->>DB: Load reminder
-Worker->>WAHA: Send reminder
+Scheduler->>Scheduler: Ticker 60s
+Scheduler->>Service: ProcessDueReminders
+Service->>Repository: GetDueReminders
+loop For each due reminder
+  Service->>Repository: ClaimReminder
+  Service->>WAHA: SendText
+  alt Success
+    Service->>Repository: MarkReminderSent
+  else Failure
+    Service->>Repository: MarkReminderRetrying or MarkReminderFailed
+  end
+end
 WAHA->>User: Reminder message
 ```
 
 ---
 
-# 8. Voice Note Flow
+# 8. Backend Module Structure
 
-## Voice Processing Pipeline
+```text
+backend/
 
-```mermaid
-flowchart TD
+cmd/
+  api/
+    main.go              # Boot: config, db, scheduler, routes, server
 
-A[Voice Note Received] --> B[WAHA Media Event]
+internal/
+  ai/                    # Intent extraction, language, reminder parsing
+    intent.go
+    language.go
+    parser.go
+    reminder_parser.go
+  config/
+    config.go            # godotenv, AppConfig
+  database/
+    init.go              # Connect + Migrate
+    postgres.go          # GORM connection
+    migrate.go           # AutoMigrate
+  handler/
+    webhook.go           # WebhookHandler
+    reminder_handler.go  # GetReminders, GetPendingReminders
+    failed_reminder_handler.go
+    health_check.go
+  middleware/
+    recover.go
+    rate_limit.go
+    webhook_auth.go
+  model/
+    base.go
+    incoming_message.go  # IncomingMessage, WAHAWebhookEnvelope, WAHAMessagePayload
+    message.go           # Message (persistence)
+    reminder.go
+    reminder_status.go
+  repository/
+    message_repository.go
+    reminder_repository.go
+  scheduler/
+    scheduler.go         # 60s ticker → ProcessDueReminders
+  service/
+    message_service.go   # ProcessMessage
+    reminder_service.go  # CreateReminderFromMessage, ListRemindersFromMessage
+    reminder_worker.go    # ProcessDueReminders
+    reminder_query_service.go
+    health_service.go
+  utils/
+    logger.go            # LogInbound, LogOutbound, LogDB, LogScheduler, LogAI, LogSecurity, LogSystem
+  whatsapp/
+    send.go              # SendText, outbound safety
+    payload.go           # ExtractMessageFromWAHA
+    lid.go               # ResolveSendTarget, ResolveLIDToPhone
+    health.go            # CheckWAHA
 
-B --> C[Download Audio]
-
-C --> D[Whisper Transcription]
-
-D --> E[Language Detection]
-
-E --> F[LLM Parser]
-
-F --> G[Canonical Internal Intent]
-
-G --> H[Reminder Service]
-
-H --> I[Localized Reply Builder]
+Dockerfile
+go.mod
 ```
+
+### Architecture Rule
+
+```text
+handler → service → repository → gorm → postgres
+```
+
+- Handler never calls repository directly.
+- Service never uses GORM.
+- All outbound WhatsApp goes through `internal/whatsapp/send.go`.
 
 ---
 
-# 9. AI Parsing Contract
+# 9. API Endpoints
+
+| Endpoint            | Method | Purpose                    | Middleware              |
+| ------------------- | ------ | -------------------------- | ----------------------- |
+| /health             | GET    | Health check (DB + WAHA)   | Recover                 |
+| /webhook            | POST   | Incoming WAHA webhook      | Recover, RateLimit, WebhookAuth |
+| /reminders          | GET    | List reminders (?from=)    | Recover                 |
+| /reminders/pending  | GET    | List pending reminders     | Recover                 |
+| /reminders/failed   | GET    | List failed reminders (?from=) | Recover              |
+
+---
+
+# 10. AI Parsing Contract
 
 ## Input
 
@@ -357,296 +474,221 @@ Both inputs map to the same canonical output:
 - **Allowed:** `create_reminder`
 - **Forbidden:** `buat_pengingat`
 
-## Parser Examples
+## Supported Intents
 
-**English:**
-
-```text
-remind me to pay electricity tomorrow 8pm
-```
-
-**Indonesian:**
-
-```text
-ingatkan saya untuk bayar listrik besok jam 8 malam
-```
-
-Both map internally to the same Canonical Intent.
+- `create_reminder`
+- `list_reminders`
+- `store_memory` (detected, not yet implemented)
+- `ignore_smalltalk`
+- `unknown`
 
 ---
 
-# 10. Database Schema
+# 11. Database Schema
 
 ## reminders
 
 ```sql
 CREATE TABLE reminders (
-    id UUID PRIMARY KEY,
-    user_id TEXT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "from" TEXT NOT NULL,
     task TEXT NOT NULL,
+    raw_time TEXT,
     remind_at TIMESTAMP NOT NULL,
-    recurrence TEXT,
     status TEXT DEFAULT 'pending',
-    language TEXT DEFAULT 'id',
+    sent_at TIMESTAMP,
+    retry_count INT DEFAULT 0,
+    last_error TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 ```
 
-- `language` stored for analytics and localized delivery.
-- Business logic remains language-neutral.
+Status values: `pending`, `processing`, `retrying`, `sent`, `failed`.
 
 ---
 
-## users
+## messages
 
 ```sql
-CREATE TABLE users (
+CREATE TABLE messages (
     id UUID PRIMARY KEY,
-    whatsapp_id TEXT UNIQUE,
+    "from" TEXT NOT NULL,
+    body TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT now()
 );
 ```
 
----
-
-## memories
-
-```sql
-CREATE TABLE memories (
-    id UUID PRIMARY KEY,
-    user_id UUID,
-    content TEXT,
-    type TEXT,
-    language TEXT DEFAULT 'id',
-    created_at TIMESTAMP DEFAULT now()
-);
-```
-
-- `language` stored for analytics and localized delivery.
+Index: `idx_message_duplicate` on (from, body, created_at) for duplicate detection.
 
 ---
 
-# 11. Backend Module Structure
-
-```text
-backend/
-
-cmd/api/main.go
-
-internal/
-  whatsapp/
-  ai/
-  reminder/
-  scheduler/
-  database/
-  memory/
-  worker/
-  service/
-    language_detector.go
-    reply_builder.go
-  i18n/
-```
-
-## Internal Multilingual Components
-
-### language_detector.go
-
-- Detects `id` or `en` from incoming message.
-- Runs before Intent Parsing.
-
-### reply_builder.go
-
-- Generates response text based on detected language.
-- Uses localized templates from `internal/i18n/`.
-
-### internal/i18n/
-
-- Localized message templates.
-- Supports Indonesian and English.
-
----
-
-# 12. Recommended Go Packages
-
-| Concern   | Library        |
-| --------- | -------------- |
-| HTTP API  | gin            |
-| DB ORM    | gorm / sqlx    |
-| Queue     | asynq          |
-| Migration | golang-migrate |
-| Logging   | zap            |
-| Config    | viper          |
-
----
-
-# 13. WAHA Integration Contract
+# 12. WAHA Integration Contract
 
 ## Send Message
 
 Endpoint:
 
 ```text
-POST /api/sendText
+POST {WAHA_BASE_URL}/api/sendText
 ```
 
-Payload (localized response):
-
-**English:**
+Payload:
 
 ```json
 {
+  "session": "default",
   "chatId": "628123456789@c.us",
   "text": "Reminder noted"
 }
 ```
 
-**Indonesian:**
-
-```json
-{
-  "chatId": "628123456789@c.us",
-  "text": "Pengingat disimpan"
-}
-```
+Headers: `Content-Type: application/json`, `X-Api-Key` (if `WAHA_API_KEY` set).
 
 ---
 
 ## Webhook Receive
 
-Expected fields:
+WAHA sends:
 
 ```json
 {
-  "from": "628123456789@c.us",
-  "body": "remind me tomorrow"
+  "event": "message",
+  "session": "default",
+  "payload": {
+    "from": "628123456789@c.us",
+    "body": "remind me tomorrow",
+    "fromMe": false
+  }
 }
 ```
 
----
-
-# 14. Suggested API Endpoints
-
-| Endpoint   | Purpose               |
-| ---------- | --------------------- |
-| /webhook   | incoming WAHA webhook |
-| /health    | health check          |
-| /reminders | list reminders        |
-| /memory    | list stored memory    |
+Fallback for tests: flat `{ "from": "...", "body": "..." }`.
 
 ---
 
-# 15. Scheduling Strategy
+## LID Resolution
 
-## Preferred Approach
-
-Use Redis queue:
+Endpoint:
 
 ```text
-Asynq
+GET {WAHA_BASE_URL}/api/default/lids/{lid}
 ```
 
-Reason:
+Response: `{ "lid": "...", "pn": "628123456789@c.us" }` or `pn: null`.
 
-- delayed jobs
-- retries
-- production safe
+Used when `from` or send target is `...@lid` — resolve to phone before sending.
 
 ---
 
-# 16. Production Deployment Architecture
+## Health Check
 
-```mermaid
-flowchart TD
-
-A[Cloud VPS] --> B[Docker Compose]
-
-B --> C[Nginx]
-
-C --> D[Go API]
-
-D --> E[WAHA]
-
-D --> F[Postgres]
-
-D --> G[Redis]
-
-D --> H[Worker]
+```text
+GET {WAHA_BASE_URL}/api/sessions
 ```
+
+Returns 200 if WAHA is reachable.
 
 ---
 
-# 17. Security Considerations
+# 13. Config & Environment
+
+| Variable       | Purpose                          |
+| -------------- | --------------------------------- |
+| DB_HOST        | PostgreSQL host                   |
+| DB_USER        | PostgreSQL user                   |
+| DB_PASSWORD     | PostgreSQL password               |
+| DB_NAME        | PostgreSQL database               |
+| DB_PORT        | PostgreSQL port                   |
+| BOT_NUMBER     | Self number (block send to self)   |
+| WAHA_BASE_URL  | WAHA API base (default: localhost:3000) |
+| WAHA_API_KEY   | Optional API key for WAHA          |
+| WEBHOOK_SECRET | Required for webhook auth         |
+| APP_ENV        | `dev` enables ?token= fallback     |
+
+---
+
+# 14. Logging Categories
+
+| Category   | Function       | Use                          |
+| ---------- | -------------- | ---------------------------- |
+| INBOUND    | LogInbound     | Webhook receive, duplicates  |
+| OUTBOUND   | LogOutbound    | Send attempts, blocks        |
+| DB         | LogDB          | Repository operations        |
+| SCHEDULER  | LogScheduler   | Due reminders, retries       |
+| AI         | LogAI          | Parse results                |
+| INBOUND/SECURITY | LogSecurity | Webhook auth                 |
+| SYSTEM     | LogSystem      | Panic, startup               |
+
+---
+
+# 15. Security Considerations
 
 ## Required
 
-- webhook authentication
-- WAHA API token
-- encrypted secrets
-- database backup
+- Webhook authentication (`X-Webhook-Secret`)
+- WAHA API token (optional, recommended in prod)
+- Encrypted secrets in `.env`
+- Database backup
+
+## Implemented
+
+- Rate limiting (10/60s per IP on webhook)
+- Panic recovery
+- Self-message filtering
+- Duplicate inbound/outbound prevention
 
 ## Recommended
 
 - HTTPS
-- reverse proxy
-- rate limiting
+- Reverse proxy
+- Migration to explicit migration tool (post-MVP)
 
 ---
 
-# 18. Future Expansion
+# 16. Future Expansion
 
-## Multilingual Foundation (MVP Implemented)
+## Phase 2 (Planned)
 
-- **Multilingual foundation implemented in MVP (Indonesian + English)**
-- Language Detection before Intent Parsing
-- Canonical Intent (language-independent)
-- Localized Reply Builder
-
-## Phase 2
-
-- Google Calendar sync
-- AI memory retrieval
+- Redis queue (Asynq) for delayed jobs
+- Voice note transcription
+- Recurring tasks
+- Memory retrieval
+- Localized reply builder (i18n templates)
 
 ## Phase 3
 
+- Google Calendar sync
 - Personal agent mode
 - Team memory
 - Shared reminders
 
-## Future Multilingual Expansion
+## Future Multilingual
 
 - Regional language support
 - Voice multilingual parsing
 
 ---
 
-# 19. Suggested Repository Naming
+# 17. Recommended First Build Order
 
-```text
-nemoris-core
-nemoris-api
-nemoris-worker
-nemoris-ai
-nemoris-infra
-```
-
----
-
-# 20. Recommended First Build Order
-
-## Phase 1
+## Phase 1 (Implemented)
 
 1. WAHA connect
-2. webhook receive
-3. send reply
-4. parse reminder
-5. save postgres
-6. worker reminder
+2. Webhook receive
+3. Send reply
+4. Parse reminder (rule-based)
+5. Save PostgreSQL
+6. In-process scheduler for reminders
+7. LID resolution
+8. Retry logic (3 attempts)
+9. Failed reminders API
 
 ## Phase 2
 
-7. voice transcription
-8. recurring tasks
-9. memory retrieval
+10. Voice transcription
+11. Recurring tasks
+12. Memory retrieval
+13. Redis/Asynq for scheduling
 
 ---
 
@@ -659,5 +701,3 @@ Nemoris should remain:
 Because users only care that:
 
 > they send one message and it always remembers.
-
----

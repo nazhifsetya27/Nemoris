@@ -1,5 +1,7 @@
 # NEMORIS Project Description
 
+*Last updated: 2026-03-08*
+
 NEMORIS is a production-oriented WhatsApp-native AI memory assistant built with:
 
 - Go backend
@@ -274,9 +276,9 @@ So migration from JavaScript mental model stays easy.
 
 ---
 
-## Backend Architecture Target
+## Backend Architecture (Current)
 
-Use standard Go production layout:
+Standard Go production layout:
 
 ```text
 backend/
@@ -285,20 +287,17 @@ backend/
  │       └── main.go
  │
  ├── internal/
- │   ├── ai/           # LLM parsing, intent extraction, NLP pipeline
+ │   ├── ai/           # intent extraction, language detection, reminder parsing (rule-based)
  │   ├── config/       # environment loading, app config, secrets mapping
  │   ├── database/     # postgres connection, migrations, db bootstrap
  │   ├── handler/      # HTTP handlers / webhook entrypoints
- │   ├── i18n/         # localized message templates (id, en)
+ │   ├── middleware/   # recover, rate limit, webhook auth
  │   ├── model/        # shared structs and domain models
- │   ├── reminder/     # reminder domain logic
  │   ├── repository/   # database access layer via GORM
- │   ├── scheduler/    # delayed jobs / recurring reminder execution
+ │   ├── scheduler/    # in-process 60s ticker → ProcessDueReminders
  │   ├── service/      # orchestration between modules
- │   │   ├── language_detector.go   # detect id/en from incoming message
- │   │   └── reply_builder.go      # generate response based on language
- │   ├── utils/        # shared helpers, reusable utilities
- │   └── whatsapp/     # WAHA integration, send/receive safety logic
+ │   ├── utils/        # shared helpers, logging
+ │   └── whatsapp/     # WAHA integration, send/receive, LID resolution
  │
  ├── Dockerfile
  └── go.mod
@@ -306,9 +305,9 @@ backend/
 
 ### Multilingual Components
 
-- **language_detector.go** — Detects `id` or `en` from incoming message; runs before Intent Parsing.
-- **reply_builder.go** — Generates response text based on detected language.
-- **internal/i18n/** — Localized message templates.
+- **ai/language.go** — Detects `id` or `en` from incoming message; runs before Intent Parsing.
+- **ai/intent.go** — Canonical intent detection.
+- **Localized reply builder** — Planned for Phase 2; currently uses simple strings.
 
 ---
 

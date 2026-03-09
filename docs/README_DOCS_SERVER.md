@@ -1,5 +1,7 @@
 # NEMORIS Docs — Read on Your Phone
 
+*Last updated: 2026-03-07*
+
 ## Quick Start
 
 ```bash

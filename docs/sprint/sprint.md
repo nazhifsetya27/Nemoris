@@ -1,5 +1,7 @@
 # **Week 1 — Core Stabilization**
 
+*Last updated: 2026-03-07*
+
 # Sprint Goal
 
 Stabilize current MVP foundation before adding production complexity.

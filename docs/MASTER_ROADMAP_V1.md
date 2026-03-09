@@ -1,5 +1,7 @@
 # NEMORIS Master Roadmap v1
 
+*Last updated: 2026-03-07*
+
 ## Mission
 
 > One message sent, system never forgets.
