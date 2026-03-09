@@ -54,6 +54,9 @@ func RetrieveMemoryReply(from string, body string, lang string) string {
 	if len(memories) == 0 {
 		return i18n.Build(lang, "retrieve_memory_empty", nil)
 	}
+	if len(memories) > 1 {
+		return i18n.Build(lang, "retrieve_memory_ambiguous", nil)
+	}
 	return i18n.Build(lang, "retrieve_memory_success", map[string]string{"content": memories[0].Content})
 }
 
