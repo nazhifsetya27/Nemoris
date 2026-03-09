@@ -24,7 +24,7 @@ func main() {
 	pass, fail := 0, 0
 
 	// DB health
-	hr := service.CheckHealth()
+	hr := service.CheckHealth(scheduler.GetLastTick)
 	out.WriteString(fmt.Sprintf("--- Health Check ---\n"))
 	out.WriteString(fmt.Sprintf("status=%s database=%s waha=%s\n", hr.Status, hr.Database, hr.WAHA))
 

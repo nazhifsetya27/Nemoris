@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"nemoris/internal/service"
@@ -11,6 +12,11 @@ import (
 const (
 	tickInterval   = 60 * time.Second
 	driftThreshold = 5 * time.Second
+)
+
+var (
+	lastTick   time.Time
+	lastTickMu sync.RWMutex
 )
 
 func Start() {
@@ -43,7 +49,18 @@ func Start() {
 	}()
 }
 
+// GetLastTick returns when the scheduler last ran. Safe for concurrent read.
+func GetLastTick() time.Time {
+	lastTickMu.RLock()
+	defer lastTickMu.RUnlock()
+	return lastTick
+}
+
 func runTick() {
+	lastTickMu.Lock()
+	lastTick = time.Now()
+	lastTickMu.Unlock()
+
 	utils.LogScheduler("checking due reminders")
 
 	metrics := NewSchedulerMetrics()

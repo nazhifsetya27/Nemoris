@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"nemoris/internal/scheduler"
 	"nemoris/internal/service"
 )
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	result := service.CheckHealth()
+	result := service.CheckHealth(scheduler.GetLastTick)
 
 	statusCode := http.StatusOK
 	if result.Status != "ok" {
