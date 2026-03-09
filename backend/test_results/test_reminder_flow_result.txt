@@ -1,0 +1,15 @@
+=== test_reminder_flow.go ===
+
+--- Self message ---
+PASS self message ignored (empty response)
+
+--- Duplicate message ---
+PASS duplicate returns 'duplicate ignored'
+  first response: "Okay, I'll remind you tomorrow 8pm."
+
+--- Valid reminder ---
+PASS valid reminder: localized reply returned
+  reply: "Okay, I'll remind you tomorrow 9pm."
+
+--- Summary ---
+PASS: 3  FAIL: 0

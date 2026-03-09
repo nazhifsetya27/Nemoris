@@ -1,0 +1,12 @@
+=== test_health.go ===
+
+--- Health Check ---
+status=ok database=ok waha=ok
+PASS DB health
+PASS WAHA health (checked)
+
+PASS scheduler metrics (NewSchedulerMetrics, Log)
+PASS GetReminderBacklogStats: pending=6 overdue=0
+
+--- Summary ---
+PASS: 4  FAIL: 0
