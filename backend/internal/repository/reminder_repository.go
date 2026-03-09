@@ -133,29 +133,32 @@ func MarkReminderSent(id string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"status":      model.ReminderSent,
-			"sent_at":     &now,
-			"last_error":  "",
+			"status":       model.ReminderSent,
+			"sent_at":      &now,
+			"last_error":   "",
+			"failure_type": "",
 		}).Error
 }
 
-func MarkReminderRetrying(id string, retryCount int, lastError string) error {
+func MarkReminderRetrying(id string, retryCount int, lastError string, failureType string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"status":      model.ReminderRetrying,
-			"retry_count": retryCount,
-			"last_error":  lastError,
+			"status":       model.ReminderRetrying,
+			"retry_count":  retryCount,
+			"last_error":   lastError,
+			"failure_type": failureType,
 		}).Error
 }
 
-func MarkReminderFailed(id string, retryCount int, lastError string) error {
+func MarkReminderFailed(id string, retryCount int, lastError string, failureType string) error {
 	return database.DB.Model(&model.Reminder{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"status":      model.ReminderFailed,
-			"retry_count": retryCount,
-			"last_error":  lastError,
+			"status":       model.ReminderFailed,
+			"retry_count":  retryCount,
+			"last_error":   lastError,
+			"failure_type": failureType,
 		}).Error
 }
 

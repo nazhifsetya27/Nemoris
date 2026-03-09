@@ -68,7 +68,7 @@ func main() {
 	}
 
 	// MarkReminderRetrying
-	err = repository.MarkReminderRetrying(testReminder.ID, 1, "test retry")
+	err = repository.MarkReminderRetrying(testReminder.ID, 1, "test retry", model.FailureUnknownSendErr)
 	if err != nil {
 		out.WriteString(fmt.Sprintf("FAIL MarkReminderRetrying: %v\n", err))
 		fail++
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// MarkReminderFailed (simulate after 3 retries)
-	err = repository.MarkReminderFailed(testReminder.ID, 3, "test failed")
+	err = repository.MarkReminderFailed(testReminder.ID, 3, "test failed", model.FailureUnknownSendErr)
 	if err != nil {
 		out.WriteString(fmt.Sprintf("FAIL MarkReminderFailed: %v\n", err))
 		fail++

@@ -2,25 +2,47 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"nemoris/internal/model"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 	"nemoris/internal/whatsapp"
 )
 
-func handleRetry(reminderID string, retryCount int, lastError string) {
+func classifyFailure(err error, accepted bool) string {
+	if !accepted && err == nil {
+		return model.FailureInvalidTarget
+	}
+	if err == nil {
+		return model.FailureUnknownSendErr
+	}
+	s := strings.ToLower(err.Error())
+	if strings.Contains(s, "timeout") || strings.Contains(s, "deadlineexceeded") {
+		return model.FailureWahaTimeout
+	}
+	if strings.Contains(s, "blocked") || strings.Contains(s, "invalid") || strings.Contains(s, "chatid") {
+		return model.FailureInvalidTarget
+	}
+	if strings.Contains(s, "lock") || strings.Contains(s, "deadlock") {
+		return model.FailureDBLockFail
+	}
+	return model.FailureUnknownSendErr
+}
+
+func handleRetry(reminderID string, retryCount int, lastError string, failureType string) {
 	nextRetry := retryCount + 1
 
 	if nextRetry >= 3 {
-		err := repository.MarkReminderFailed(reminderID, nextRetry, lastError)
+		err := repository.MarkReminderFailed(reminderID, nextRetry, lastError, failureType)
 		if err != nil {
 			utils.LogScheduler("failed mark failed: " + err.Error())
 		}
 		return
 	}
 
-	err := repository.MarkReminderRetrying(reminderID, nextRetry, lastError)
+	err := repository.MarkReminderRetrying(reminderID, nextRetry, lastError, failureType)
 	if err != nil {
 		utils.LogScheduler("failed mark retrying: " + err.Error())
 	}
@@ -88,13 +110,15 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 			reason := sendResult.Err.Error()
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=" + reason)
 			t2 := time.Now()
-			handleRetry(reminder.ID, reminder.RetryCount, reason)
+			ft := classifyFailure(sendResult.Err, sendResult.Accepted)
+			handleRetry(reminder.ID, reminder.RetryCount, reason, ft)
 			updateDuration = time.Since(t2)
 			trackRetryOrFailed(reminder.RetryCount, &result)
 		} else if !sendResult.Accepted {
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=send rejected")
 			t2 := time.Now()
-			handleRetry(reminder.ID, reminder.RetryCount, "send rejected")
+			ft := classifyFailure(nil, false)
+			handleRetry(reminder.ID, reminder.RetryCount, "send rejected", ft)
 			updateDuration = time.Since(t2)
 			trackRetryOrFailed(reminder.RetryCount, &result)
 		} else {
