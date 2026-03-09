@@ -2,6 +2,27 @@ package i18n
 
 import "strings"
 
+// languages is the centralized registry: code -> templates.
+// Populated by RegisterLanguage during init.
+var languages = map[string]map[string]string{}
+
+// RegisterLanguage registers templates for a language code.
+// Ignores empty code safely. No mutex; init-only registration.
+func RegisterLanguage(code string, templates map[string]string) {
+	if code == "" {
+		return
+	}
+	if templates == nil {
+		return
+	}
+	languages[code] = templates
+}
+
+func init() {
+	RegisterLanguage("en", En)
+	RegisterLanguage("id", Id)
+}
+
 // intentToKey maps canonical intent to reply template key.
 // Unknown intents fall back to "unknown".
 var intentToKey = map[string]string{
@@ -45,14 +66,13 @@ func Build(lang string, key string, data map[string]string) string {
 	return msg
 }
 
-// getTemplates returns templates for lang; unknown lang falls back to En.
+// getTemplates returns templates for lang; unknown lang falls back to en registry.
 func getTemplates(lang string) map[string]string {
-	switch lang {
-	case "id":
-		return Id
-	case "en":
-		return En
-	default:
-		return En
+	if t := languages[lang]; t != nil {
+		return t
 	}
+	if t := languages["en"]; t != nil {
+		return t
+	}
+	return En
 }
