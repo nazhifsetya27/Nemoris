@@ -4,9 +4,9 @@ import "strings"
 
 // DetectIntent returns a canonical intent from the message body.
 // Supports English and Indonesian keywords.
-// Returns: create_reminder, list_reminders, store_memory, ignore_smalltalk, or unknown.
+// Returns: create_reminder, list_reminders, store_memory, retrieve_memory, ignore_smalltalk, or unknown.
 //
-// Detection order prevents collisions: create_reminder → list_reminders → store_memory → ignore_smalltalk → unknown.
+// Detection order prevents collisions: create_reminder → list_reminders → store_memory → retrieve_memory → ignore_smalltalk → unknown.
 func DetectIntent(body string) string {
 	lower := strings.ToLower(strings.TrimSpace(body))
 
@@ -29,7 +29,17 @@ func DetectIntent(body string) string {
 		return "store_memory"
 	}
 
-	// 4. ignore_smalltalk (exact match to avoid "hi" in "this")
+	// 4. retrieve_memory
+	if strings.Contains(lower, "what did i tell") || strings.Contains(lower, "what did i say") ||
+		strings.Contains(lower, "what is my") || strings.Contains(lower, "what do you remember") ||
+		strings.Contains(lower, "what did you remember") ||
+		strings.Contains(lower, "apa yang saya bilang") || strings.Contains(lower, "apa yang aku bilang") ||
+		strings.Contains(lower, "apa yang saya katakan") || strings.Contains(lower, "apa yang aku katakan") ||
+		strings.Contains(lower, "berapa nomor rekening") {
+		return "retrieve_memory"
+	}
+
+	// 5. ignore_smalltalk (exact match to avoid "hi" in "this")
 	switch lower {
 	case "hi", "hello", "thanks", "halo", "hai", "makasih", "terima kasih":
 		return "ignore_smalltalk"
