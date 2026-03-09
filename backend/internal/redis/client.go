@@ -132,3 +132,33 @@ func ListPop(key string) (string, error) {
 	defer cancel()
 	return client.LPop(ctx, key).Result()
 }
+
+// SortedSetAdd adds member with score to sorted set. Returns ErrRedisUnavailable when client nil.
+func SortedSetAdd(key string, score float64, member string) error {
+	if client == nil {
+		return ErrRedisUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.ZAdd(ctx, key, rd.Z{Score: score, Member: member}).Err()
+}
+
+// SortedSetRangeByScore returns members with score <= max, up to limit. Returns ErrRedisUnavailable when client nil.
+func SortedSetRangeByScore(key string, max float64, limit int64) ([]string, error) {
+	if client == nil {
+		return nil, ErrRedisUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.ZRangeByScore(ctx, key, &rd.ZRangeBy{Min: "-inf", Max: fmt.Sprintf("%.0f", max), Count: limit}).Result()
+}
+
+// SortedSetRem removes members from sorted set. Returns ErrRedisUnavailable when client nil.
+func SortedSetRem(key string, members ...interface{}) error {
+	if client == nil {
+		return ErrRedisUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.ZRem(ctx, key, members...).Err()
+}

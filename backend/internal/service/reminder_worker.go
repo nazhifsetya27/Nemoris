@@ -34,6 +34,8 @@ func classifyFailure(err error, accepted bool) string {
 	return model.FailureUnknownSendErr
 }
 
+const retryDelay = 60 * time.Second
+
 func handleRetry(reminderID string, retryCount int, lastError string, failureType string) {
 	nextRetry := retryCount + 1
 
@@ -48,7 +50,10 @@ func handleRetry(reminderID string, retryCount int, lastError string, failureTyp
 	err := repository.MarkReminderRetrying(reminderID, nextRetry, lastError, failureType)
 	if err != nil {
 		utils.LogScheduler("failed mark retrying: " + err.Error())
+		return
 	}
+
+	_ = queue.EnqueueDelayed(reminderID, time.Now().Add(retryDelay))
 }
 
 // ReminderBacklogStats holds pending and overdue counts for startup logging.
@@ -108,6 +113,8 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 // processFromQueue dequeues and executes. Execution reads through queue path.
 func processFromQueue() (ProcessDueRemindersResult, error) {
 	result := ProcessDueRemindersResult{}
+
+	queue.PromoteDelayedToExec()
 
 	for {
 		reminderID, err := queue.Dequeue()
