@@ -21,17 +21,22 @@ func Start() {
 		utils.LogScheduler(fmt.Sprintf("startup backlog pending=%d overdue=%d", stats.Pending, stats.Overdue))
 	}
 
+	prevTick := time.Now()
 	runTick()
 
 	ticker := time.NewTicker(tickInterval)
-	prevTick := time.Now()
+	firstTick := true
 	go func() {
 		for range ticker.C {
 			now := time.Now()
-			actualInterval := now.Sub(prevTick)
-			if actualInterval > tickInterval+driftThreshold {
-				utils.LogScheduler(fmt.Sprintf("scheduler drift detected: %s", actualInterval))
+			if !firstTick {
+				actualInterval := now.Sub(prevTick)
+				if actualInterval > tickInterval+driftThreshold {
+					delay := actualInterval - tickInterval
+					utils.LogScheduler(fmt.Sprintf("drift detected delay=%s", delay))
+				}
 			}
+			firstTick = false
 			prevTick = now
 			runTick()
 		}
