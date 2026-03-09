@@ -14,4 +14,9 @@ type Reminder struct {
 	LastError   string `gorm:"type:text"`
 	FailureType string `gorm:"column:failure_type;size:32"`
 	CreatedAt   time.Time
+
+	// Recurrence (schema-only; inactive when empty/zero/null)
+	RecurrenceType    string     `gorm:"size:32"`
+	RecurrenceInterval int
+	NextRunAt         *time.Time
 }
