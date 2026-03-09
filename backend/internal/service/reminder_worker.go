@@ -25,11 +25,49 @@ func handleRetry(reminderID string, retryCount int, lastError string) {
 	}
 }
 
-func ProcessDueReminders() error {
+// ReminderBacklogStats holds pending and overdue counts for startup logging.
+type ReminderBacklogStats struct {
+	Pending int
+	Overdue int
+}
+
+// GetReminderBacklogStats returns pending and overdue reminder counts.
+func GetReminderBacklogStats() (ReminderBacklogStats, error) {
+	stats := ReminderBacklogStats{}
+	pending, err := repository.CountPendingReminders()
+	if err != nil {
+		return stats, err
+	}
+	overdue, err := repository.CountOverdueReminders()
+	if err != nil {
+		return stats, err
+	}
+	stats.Pending = pending
+	stats.Overdue = overdue
+	return stats, nil
+}
+
+// ProcessDueRemindersResult holds counts from a single run for scheduler metrics.
+type ProcessDueRemindersResult struct {
+	Checked       int
+	Due          int
+	Sent         int
+	Retry        int
+	Failed       int
+	ClaimConflicts int
+}
+
+// ProcessDueReminders fetches due reminders, sends them, and returns execution counts.
+func ProcessDueReminders() (ProcessDueRemindersResult, error) {
+	result := ProcessDueRemindersResult{}
+
 	reminders, err := repository.GetDueReminders()
 	if err != nil {
-		return err
+		return result, err
 	}
+
+	result.Checked = len(reminders)
+	result.Due = len(reminders)
 
 	for _, reminder := range reminders {
 		utils.LogScheduler("due reminder found: " + reminder.Task)
@@ -37,29 +75,43 @@ func ProcessDueReminders() error {
 		claimed := repository.ClaimReminder(reminder.ID)
 		if !claimed {
 			utils.LogScheduler("already claimed: " + reminder.Task)
+			result.ClaimConflicts++
 			continue
 		}
 
 		text := fmt.Sprintf("Reminder: %s", reminder.Task)
 
-		result := whatsapp.SendText(reminder.From, text)
-		if result.Err != nil {
-			reason := result.Err.Error()
+		sendResult := whatsapp.SendText(reminder.From, text)
+		if sendResult.Err != nil {
+			reason := sendResult.Err.Error()
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=" + reason)
 			handleRetry(reminder.ID, reminder.RetryCount, reason)
+			trackRetryOrFailed(reminder.RetryCount, &result)
 			continue
 		}
-		if !result.Accepted {
+		if !sendResult.Accepted {
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=send rejected")
 			handleRetry(reminder.ID, reminder.RetryCount, "send rejected")
+			trackRetryOrFailed(reminder.RetryCount, &result)
 			continue
 		}
 
 		err = repository.MarkReminderSent(reminder.ID)
 		if err != nil {
 			utils.LogScheduler("failed mark sent: " + err.Error())
+			continue
 		}
+		result.Sent++
 	}
 
-	return nil
+	return result, nil
+}
+
+// trackRetryOrFailed increments Retry or Failed based on retry count.
+func trackRetryOrFailed(retryCount int, r *ProcessDueRemindersResult) {
+	if retryCount+1 >= 3 {
+		r.Failed++
+	} else {
+		r.Retry++
+	}
 }

@@ -60,6 +60,22 @@ func GetDueReminders() ([]model.Reminder, error) {
 	return reminders, err
 }
 
+func CountPendingReminders() (int, error) {
+	var count int64
+	err := database.DB.Model(&model.Reminder{}).
+		Where("remind_at > ? AND status = ?", time.Now(), model.ReminderPending).
+		Count(&count).Error
+	return int(count), err
+}
+
+func CountOverdueReminders() (int, error) {
+	var count int64
+	err := database.DB.Model(&model.Reminder{}).
+		Where("remind_at <= ? AND status IN ?", time.Now(), []string{model.ReminderPending, model.ReminderRetrying}).
+		Count(&count).Error
+	return int(count), err
+}
+
 // Lifecycle Updates
 
 func ClaimReminder(id string) bool {
