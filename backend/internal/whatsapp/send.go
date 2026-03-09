@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"nemoris/internal/config"
+	"nemoris/internal/formatter"
 	"nemoris/internal/utils"
 )
 
@@ -60,6 +61,7 @@ type SendResult struct {
 func SendText(to string, text string) SendResult {
 	// Protection 3: safe empty normalization
 	text = strings.TrimSpace(text)
+	text = formatter.FormatOutput(text)
 	if text == "" {
 		utils.LogOutbound("Blocked empty message")
 		return SendResult{Accepted: false, Err: nil}

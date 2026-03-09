@@ -5,6 +5,7 @@ import (
 
 	"nemoris/internal/ai"
 	"nemoris/internal/config"
+	"nemoris/internal/formatter"
 	"nemoris/internal/i18n"
 	"nemoris/internal/model"
 	"nemoris/internal/repository"
@@ -17,7 +18,8 @@ func ProcessMessage(from string, body string) string {
 		return ""
 	}
 
-	isDuplicate, err := repository.FindRecentDuplicate(from, body)
+	normalizedBody := formatter.NormalizeInput(body)
+	isDuplicate, err := repository.FindRecentDuplicate(from, normalizedBody)
 	if err != nil {
 		utils.LogDB("Duplicate check failed: " + err.Error())
 		return "internal error"
@@ -34,7 +36,7 @@ func ProcessMessage(from string, body string) string {
 		return "internal error"
 	}
 
-	parsed := ai.Parse(body)
+	parsed := ai.Parse(normalizedBody)
 
 	if parsed.Intent == "create_reminder" {
 		if parsed.Time == "" {
@@ -43,7 +45,7 @@ func ProcessMessage(from string, body string) string {
 			}
 			return "please specify reminder time"
 		}
-		if response := CreateReminderFromMessage(from, body, parsed.Lang); response != "" {
+		if response := CreateReminderFromMessage(from, normalizedBody, parsed.Lang); response != "" {
 			return response
 		}
 	}
@@ -55,7 +57,7 @@ func ProcessMessage(from string, body string) string {
 	if parsed.Intent == "store_memory" {
 		m := model.Memory{
 			From:    from,
-			Content: body,
+			Content: normalizedBody,
 			Lang:    parsed.Lang,
 		}
 		if err := repository.SaveMemory(m); err != nil {
@@ -66,10 +68,10 @@ func ProcessMessage(from string, body string) string {
 	}
 
 	if parsed.Intent == "retrieve_memory" {
-		return RetrieveMemoryReply(from, body, parsed.Lang)
+		return RetrieveMemoryReply(from, normalizedBody, parsed.Lang)
 	}
 
-	switch strings.ToLower(body) {
+	switch strings.ToLower(normalizedBody) {
 	case "ping":
 		return "pong"
 	default:
