@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,9 @@ import (
 )
 
 var client *redis.Client
+
+// ErrRedisUnavailable is returned when Redis client is nil (not connected).
+var ErrRedisUnavailable = errors.New("redis unavailable")
 
 const (
 	execLockPrefix = "reminder:exec:"
@@ -76,4 +80,52 @@ func Release(reminderID string) {
 	defer cancel()
 
 	_ = client.Del(ctx, key).Err()
+}
+
+// TryLockStrict attempts to acquire execution lock. Returns ErrRedisUnavailable when client nil.
+// Returns (false, nil) when lock already held. Used by queue package; no fallback.
+func TryLockStrict(reminderID string) (acquired bool, err error) {
+	if client == nil {
+		return false, ErrRedisUnavailable
+	}
+	key := execLockPrefix + reminderID
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	ok, err := client.SetNX(ctx, key, "1", execLockTTL).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
+// ReleaseStrict releases execution lock. Returns ErrRedisUnavailable when client nil.
+func ReleaseStrict(reminderID string) error {
+	if client == nil {
+		return ErrRedisUnavailable
+	}
+	key := execLockPrefix + reminderID
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.Del(ctx, key).Err()
+}
+
+// ListPush pushes value onto the right of list key. Returns ErrRedisUnavailable when client nil.
+func ListPush(key, value string) error {
+	if client == nil {
+		return ErrRedisUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.RPush(ctx, key, value).Err()
+}
+
+// ListPop pops value from the left of list key. Returns ErrRedisUnavailable when client nil.
+// Returns redis.Nil when list empty.
+func ListPop(key string) (string, error) {
+	if client == nil {
+		return "", ErrRedisUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return client.LPop(ctx, key).Result()
 }
