@@ -106,6 +106,7 @@ func ClaimOneDueReminder() (*model.Reminder, error) {
 	if err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.LogDB("no due reminder")
 			return nil, nil
 		}
 		return nil, err

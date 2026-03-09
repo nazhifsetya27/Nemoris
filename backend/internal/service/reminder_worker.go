@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
@@ -62,7 +63,9 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 	result := ProcessDueRemindersResult{}
 
 	for {
+		t0 := time.Now()
 		reminder, err := repository.ClaimOneDueReminder()
+		claimDuration := time.Since(t0)
 		if err != nil {
 			return result, err
 		}
@@ -76,27 +79,35 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 
 		text := fmt.Sprintf("Reminder: %s", reminder.Task)
 
+		t1 := time.Now()
 		sendResult := whatsapp.SendText(reminder.From, text)
+		sendDuration := time.Since(t1)
+
+		var updateDuration time.Duration
 		if sendResult.Err != nil {
 			reason := sendResult.Err.Error()
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=" + reason)
+			t2 := time.Now()
 			handleRetry(reminder.ID, reminder.RetryCount, reason)
+			updateDuration = time.Since(t2)
 			trackRetryOrFailed(reminder.RetryCount, &result)
-			continue
-		}
-		if !sendResult.Accepted {
+		} else if !sendResult.Accepted {
 			utils.LogScheduler("send failed: id=" + reminder.ID + " task=" + reminder.Task + " err=send rejected")
+			t2 := time.Now()
 			handleRetry(reminder.ID, reminder.RetryCount, "send rejected")
+			updateDuration = time.Since(t2)
 			trackRetryOrFailed(reminder.RetryCount, &result)
-			continue
+		} else {
+			t2 := time.Now()
+			err = repository.MarkReminderSent(reminder.ID)
+			updateDuration = time.Since(t2)
+			if err != nil {
+				utils.LogScheduler("failed mark sent: " + err.Error())
+			} else {
+				result.Sent++
+			}
 		}
-
-		err = repository.MarkReminderSent(reminder.ID)
-		if err != nil {
-			utils.LogScheduler("failed mark sent: " + err.Error())
-			continue
-		}
-		result.Sent++
+		utils.LogScheduler(fmt.Sprintf("profile claim=%v send=%v update=%v id=%s", claimDuration, sendDuration, updateDuration, reminder.ID))
 	}
 
 	return result, nil
