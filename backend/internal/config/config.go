@@ -15,6 +15,8 @@ type AppConfig struct {
 	DBPassword    string
 	DBName        string
 	DBPort        string
+	RedisHost     string
+	RedisPort     string
 	BotNumber     string
 	WAHABaseURL   string
 	WAHAAPIKey    string
@@ -35,12 +37,18 @@ func Load() {
 	if wahaURL == "" {
 		wahaURL = "http://localhost:3000"
 	}
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
 	App = AppConfig{
 		DBHost:        os.Getenv("DB_HOST"),
 		DBUser:        os.Getenv("DB_USER"),
 		DBPassword:    os.Getenv("DB_PASSWORD"),
 		DBName:        os.Getenv("DB_NAME"),
 		DBPort:        os.Getenv("DB_PORT"),
+		RedisHost:     os.Getenv("REDIS_HOST"),
+		RedisPort:     redisPort,
 		BotNumber:     os.Getenv("BOT_NUMBER"),
 		WAHABaseURL:   wahaURL,
 		WAHAAPIKey:    os.Getenv("WAHA_API_KEY"),

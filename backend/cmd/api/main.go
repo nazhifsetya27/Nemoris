@@ -8,6 +8,7 @@ import (
 	"nemoris/internal/database"
 	"nemoris/internal/handler"
 	"nemoris/internal/middleware"
+	"nemoris/internal/redis"
 	"nemoris/internal/scheduler"
 	"nemoris/internal/utils"
 )
@@ -15,6 +16,7 @@ import (
 func main() {
 	config.Load()
 	database.Init()
+	redis.Init()
 	scheduler.Start()
 
 	http.Handle("/health", middleware.Recover(http.HandlerFunc(handler.HealthCheck)))

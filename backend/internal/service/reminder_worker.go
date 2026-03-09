@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"nemoris/internal/model"
+	"nemoris/internal/redis"
 	"nemoris/internal/repository"
 	"nemoris/internal/utils"
 	"nemoris/internal/whatsapp"
@@ -98,6 +99,12 @@ func ProcessDueReminders() (ProcessDueRemindersResult, error) {
 		result.Checked++
 		result.Due++
 		utils.LogScheduler("due reminder found: " + reminder.Task)
+
+		acquired, _ := redis.TryLock(reminder.ID)
+		if !acquired {
+			utils.LogSchedulerWarn("Redis lock held for id=" + reminder.ID + ", proceeding (fallback)")
+		}
+		defer redis.Release(reminder.ID)
 
 		text := fmt.Sprintf("Reminder: %s", reminder.Task)
 
